@@ -1,0 +1,4 @@
+# Fasta files
+*.fa 
+*.fasta 
+*.DS_Store
