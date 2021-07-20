@@ -2,3 +2,5 @@
 *.fa 
 *.fasta 
 *.DS_Store
+# Nextflow files
+.nextflow*
