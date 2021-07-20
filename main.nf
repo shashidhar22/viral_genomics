@@ -2,7 +2,7 @@ nextflow.enable.dsl=2
 include { bbduk } from './trim_reads'
 include { runFastqc; runMultiQC } from './dataqc'
 include { bowtie_Align } from './bowtie'
-include { sam_to_bam; bam_sort; bam_index; keep_unaligned; coverage } from './samview'
+include { sam_to_bam;bam_sort;coverage } from './samview'
 
 workflow alignAndCoverage {
   fastq_path = Channel.fromFilePairs(params.fastq_path, size: 4)
@@ -15,8 +15,7 @@ workflow alignAndCoverage {
     bowtie_Align(bbduk.out.trimmed_reads, index_path)
     sam_to_bam(bowtie_Align.out.sam_path)
     bam_sort(sam_to_bam.out.bam_files)
-    bam_index(bam_sort.out.sorted_bam_file)
-    coverage(bam_index.out.indexed_path)
+    coverage(bam_sort.out.sorted_bam_file)
 }
 
 workflow trimReadsandQC {
