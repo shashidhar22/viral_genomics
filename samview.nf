@@ -10,12 +10,13 @@ process sam_to_bam {
     each bowtie_align
   output:
     tuple val(sample), path("${sample}.bam"), 
-      val("$params.out_path/alignment/bam/"), emit: bam_files
+      path("${sample}.bai"), emit: bam_files
   script:
     sample = bowtie_align[0]
     sam_path = bowtie_align[1]
     """
     samtools view -S -b ${sam_path} > ${sample}.bam
+    samtools index ${sample}.bam ${sample}.bai
     """
     
 }
@@ -25,63 +26,22 @@ process bam_sort {
 //  module "Singularity"
 //  container "$params.containers.samtools"
   label 'high_mem'
-  publishDir "$params.out_path/alignment/sorted/", mode : "copy", pattern: "*.sorted.bam"
+  publishDir "$params.out_path/alignment/sorted/", mode : "copy", pattern: "*_sorted.ba*"
   input:
     each bam_path
   output:
-    tuple val(sample), path("${sample}.sorted.bam"), 
-      val("$params.out_path/alignment/sorted/"), emit: sorted_bam_file
+    tuple val(sample), path("${sample}_sorted.bam"), 
+      path("${sample}_sorted.bai"), emit: sorted_bam_file
   script:
     sample = bam_path[0]
     bam_file = bam_path[1]
     bam_outpath = bam_path[2]
     """
     samtools sort ${bam_file} -o ${sample}_sorted.bam
+    samtools index ${sample}_sorted.bam ${sample}_sorted.bai
     """
     
 }
-
-process bam_index {
-  module "SAMtools"
-//  module "Singularity"
-//  container "$params.containers.samtools"
-  label 'high_mem'
-  publishDir "${out_path}", mode : "copy", pattern: "*.bai"
-  input:
-    each bam_path
-  output:
-    tuple val(sample), path(bam_file), path("${sample}.bai"), emit: indexed_path
-
-  script:
-    sample = bam_path[0]
-    bam_file = bam_path[1]
-    out_path = bam_path[2]
-    """
-    samtools index ${bam_file} ${sample}.bai
-    """
-}
-
-process keep_unaligned {
-  module "SAMtools"
-//  module "Singularity"
-//  container "$params.containers.samtools"
-  label 'low_mem'
-  publishDir "$params.out_path/unaligned_reads/", mode : "copy"
-  input:
-    each bam_path
-  output:
-    path "${sample}_R*.filtered.fq.gz", emit: unaligned_fastq
-  script:
-    sample = bam_path[0]
-    bam_file = bam_path[1]
-    index_file = bam_path[2]
-    """
-    samtools fastq ${bam_file} --threads 8 -F 12 -1 ${sample}_R1_filtered.fq.gz \
-    -2 ${sample}_R2_filtered.fq.gz
-    """
-    
-}
-
 
 process idxstats {
   module "SAMtools"
