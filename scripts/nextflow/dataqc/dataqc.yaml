@@ -1,9 +1,0 @@
-
-fastq_paths: '/fh/fast/warren_h/users/ebrierch/ebv_seq_project/input_data/enktl_ebv_sequencing_data/*/EBV*_L{001,002}_R{1,2}_*.fastq.gz'
-trim_test: '/fh/fast/warren_h/users/ebrierch/ebv_seq_project/input_data/trim_test/EBV*_R{1,2}.clean.fq'
-genome_assembly: '/fh/fast/warren_h/users/ebrierch/ebv_seq_project/output_data/genome_assembly/*/contigs.fasta'
-ebv_1_ref: '/fh/fast/warren_h/users/ebrierch/ebv_seq_project/input_data/refgenomes/hhv4ref_type1_NC_007605.fasta'
-ebv_2_ref: '/fh/fast/warren_h/users/ebrierch/ebv_seq_project/input_data/refgenomes/hhv4ref_type2_NC_009334_.fasta'
-out_path: '/fh/fast/warren_h/users/ebrierch/ebv_seq_project/'
-
-
