@@ -5,6 +5,7 @@ idx_files <- list.files(path = idx_path,
     pattern = "*.txt",
     full.names = TRUE)
 
+
 idx_reader <- function(idx_path) {
     sample_name <- str_extract(basename(idx_path), "EBV\\d+")
     idx_table <- read_tsv(idx_path,
