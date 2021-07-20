@@ -4,3 +4,7 @@
 *.DS_Store
 # Nextflow files
 .nextflow*
+# FASTQ files
+*.fastq
+*.fq
+*.fq.gz
