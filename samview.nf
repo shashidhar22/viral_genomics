@@ -1,41 +1,30 @@
 nextflow.enable.dsl=2
 
 process sam_to_bam {
-  module "SAMtools"
-//  module "Singularity"
-//  container "$params.containers.samtools"
+  container "$params.samtools"
   label 'low_mem'
   publishDir "$params.out_path/alignment/bam/", mode : "copy"
   input:
-    each bowtie_align
+    tuple val(sample), path(sam_path)
   output:
-    tuple val(sample), path("${sample}.bam"), 
-      path("${sample}.bai"), emit: bam_files
+    tuple val(sample), path("${sample}.bam"), emit: bam_files
   script:
-    sample = bowtie_align[0]
-    sam_path = bowtie_align[1]
     """
     samtools view -S -b ${sam_path} > ${sample}.bam
-    samtools index ${sample}.bam ${sample}.bai
     """
     
 }
 
 process bam_sort {
-  module "SAMtools"
-//  module "Singularity"
-//  container "$params.containers.samtools"
+  container "$params.samtools"
   label 'high_mem'
   publishDir "$params.out_path/alignment/sorted/", mode : "copy", pattern: "*_sorted.ba*"
   input:
-    each bam_path
+    tuple val(sample), path(bam_file)
   output:
     tuple val(sample), path("${sample}_sorted.bam"), 
       path("${sample}_sorted.bai"), emit: sorted_bam_file
   script:
-    sample = bam_path[0]
-    bam_file = bam_path[1]
-    bam_outpath = bam_path[2]
     """
     samtools sort ${bam_file} -o ${sample}_sorted.bam
     samtools index ${sample}_sorted.bam ${sample}_sorted.bai
@@ -44,40 +33,46 @@ process bam_sort {
 }
 
 process idxstats {
-  module "SAMtools"
-//  module "Singularity"
-//  container "$params.containers.samtools"
+  container "$params.samtools"
   label 'low_mem'
   publishDir "$params.out_path/idxstats/", mode : "copy"
   input:
-    each bam_path
+    tuple val(sample), path(bam_file), path(index_file)
   output:
     path "${sample}_idxstats.txt", emit: idx_output
   script:
-    sample = bam_path[0]
-    bam_file = bam_path[1]
-    out_path = bam_path[2]
     """
     samtools idxstats ${bam_file} > ${sample}_idxstats.txt
     """
 }
 
 process coverage {
-  module "SAMtools"
-//  module "Singularity"
-//  container "$params.containers.samtools"
+  container "$params.samtools"
   label 'low_mem'
   publishDir "$params.out_path/coverage/", mode : "copy"
   input:
-    each bam_path
+    tuple val(sample), path(bam_file), path(index_file)
   output:
     path "${sample}_coverage.txt", emit: coverage_output
   script:
-    sample = bam_path[0]
-    bam_file = bam_path[1]
-    index_path = bam_path[2]
     """
     samtools coverage -Q 30 -q 20 -o ${sample}_coverage.txt ${bam_file}
+    """
+}
+
+process keep_unaligned {
+  container "$params.samtools"
+  label 'low_mem'
+  publishDir "$params.out_path/coverage/", mode : "copy"
+  input:
+    tuple val(sample), path(bam_file), path(index_file)
+  output:
+    tuple val(sample), path("${sample}_R*_filtered.fq.gz"), emit : filtered_reads
+  script:
+    """
+    samtools fastq ${bam_file}\
+      --threads ${task.cpus} -F 12 \
+      -1 ${sample}_R1_filtered.fq.gz -2 ${sample}_R2_filtered.fq.gz    
     """
 }
 
