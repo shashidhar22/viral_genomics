@@ -2,29 +2,33 @@
 nextflow.enable.dsl=2
 
 process runFastqc {
-  module "Singularity"
-  container "$params.container.fastqc"
+  container "$params.fastqc"
   label 'low_mem'
   publishDir "$params.out_path/fastqc/${mode}", mode : "copy"
   input:
     tuple val(sample), path(fastq_paths)
     val mode
   output:
-    path "*.zip", emit: fastqc_results
+    path "${sample}_fastqc.zip", emit: fastqc_results
   script:
     rone = fastq_paths[0]
     rtwo = fastq_paths[1]
     rthree = fastq_paths[2]
     rfour = fastq_paths[3]
-    """
-    zcat ${rone} ${rtwo} ${rthree} ${rfour} > ${sample}.fastq
-    fastqc ${sample}.fastq
-    """
+    if (mode == "raw") 
+      """
+      zcat ${rone} ${rtwo} ${rthree} ${rfour} > ${sample}.fastq
+      fastqc -q ${sample}.fastq
+      """
+    else if (mode == "trimmed")
+      """
+      cat ${rone} ${rtwo} > ${sample}.fastq
+      fastqc -q ${sample}.fastq
+      """
 }
 
 process runMultiQC {
-  module "Singularity"
-  container "$params.container.multiqc"
+  container "$params.multiqc"
   label 'low_mem'
   publishDir "$params.out_path/mutli_qc", mode : "copy"
   input:
@@ -39,8 +43,7 @@ process runMultiQC {
 }
 
 process quast {
-  module "Singularity"
-  container "$params.container.quast"
+  container "$params.quast"
   label 'low_mem'
   publishDir "$params.out_path/quast", mode : "copy"
   input:
