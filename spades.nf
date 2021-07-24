@@ -1,7 +1,8 @@
 nextflow.enable.dsl=2
 
 process spades {
-  container "$params.spades"
+  //container "$params.spades"
+  module "SPAdes"
   label 'high_mem'
   publishDir "$params.out_path/genome_assembly/", mode : "copy"
   input:
@@ -15,12 +16,12 @@ process spades {
     if ("$params.assembly_type" == "reference_guided")
       """
       spades.py -t $task.cpus --trusted-contigs ${org_reference} --careful \
-        -1 ${forward} -2 ${reverse} -m ${memory[0]}  -o ${sample}
+        -1 ${forward} -2 ${reverse} -m ${memory[0]}  -o ${sample} > stdout.log 2> stderr.log  
       """
     else if ("$params.assembly_type" == "de_novo")
       """
       spades.py -t $task.cpus --careful \
-        -1 ${forward} -2 ${reverse} -m ${memory[0]}  -o ${sample}
+        -1 ${forward} -2 ${reverse} -m ${memory[0]}  -o ${sample} > stdout.log 2> stderr.log
       """
 }
 

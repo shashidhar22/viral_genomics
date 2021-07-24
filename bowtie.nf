@@ -17,7 +17,7 @@ process indexBowtie{
 
 
 process bowtie_Align {
-  container "$params.bowtie2"
+  module "Bowtie2"
   label 'high_mem'
   publishDir "$params.out_path/alignment/sam", mode : "copy"
   input:
@@ -29,7 +29,7 @@ process bowtie_Align {
     r1 = fastq_path[0]
     r2 = fastq_path[1]
     """
-    bowtie2 -x ${bowtie_index}/genome -1 ${r1} -2 ${r2} -S ${sample}.sam
+    bowtie2 -x ${bowtie_index}/genome -1 ${r1} -2 ${r2} -S ${sample}.sam > stdout.log 2> stderr.log  
     """
 }
 

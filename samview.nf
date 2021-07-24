@@ -7,10 +7,10 @@ process sam_to_bam {
   input:
     tuple val(sample), path(sam_path)
   output:
-    tuple val(sample), path("${sample}.bam"), emit: bam_files
+    tuple val(sample), path("${sample}_unmapped.bam"), emit: bam_files
   script:
     """
-    samtools view -S -b ${sam_path} > ${sample}.bam
+    samtools view -S -b -f 12 -F 256 ${sam_path} > ${sample}_unmapped.bam
     """
     
 }
@@ -22,12 +22,12 @@ process bam_sort {
   input:
     tuple val(sample), path(bam_file)
   output:
-    tuple val(sample), path("${sample}_sorted.bam"), 
-      path("${sample}_sorted.bai"), emit: sorted_bam_file
+    tuple val(sample), path("${sample}_unmapped_sorted.bam"), 
+      path("${sample}_unmapped_sorted.bai"), emit: sorted_bam_file
   script:
     """
-    samtools sort ${bam_file} -o ${sample}_sorted.bam
-    samtools index ${sample}_sorted.bam ${sample}_sorted.bai
+    samtools sort -n ${bam_file} -o ${sample}_unmapped_sorted.bam
+    samtools index ${sample}_unmapped_sorted.bam ${sample}_unmapped_sorted.bai
     """
     
 }
@@ -71,7 +71,7 @@ process keep_unaligned {
   script:
     """
     samtools fastq ${bam_file}\
-      --threads ${task.cpus} -F 12 \
+      --threads ${task.cpus} \
       -1 ${sample}_R1_filtered.fq.gz -2 ${sample}_R2_filtered.fq.gz    
     """
 }

@@ -32,5 +32,3 @@ nextflow \
     -w /fh/scratch/delete90/warren_h/ebv_enktl \
     -params-file main.yaml \
     -resume
-
-
