@@ -5,7 +5,7 @@ process spades {
   label 'high_mem'
   publishDir "$params.out_path/genome_assembly/", mode : "copy"
   input:
-    tuple val(sample), path(trimmed_reads)
+    tuple val(sample), path(trimmed_reads), path(org_reference)
   output:
     path "${sample}", emit: genome_assembly
   script:
@@ -14,7 +14,7 @@ process spades {
     memory = "$task.memory" =~ /\d+/
     if ("$params.assembly_type" == "reference_guided")
       """
-      spades.py -t $task.cpus --trusted-contigs $params.references.organism.ebv_1_ref --careful \
+      spades.py -t $task.cpus --trusted-contigs ${org_reference} --careful \
         -1 ${forward} -2 ${reverse} -m ${memory[0]}  -o ${sample}
       """
     else if ("$params.assembly_type" == "de_novo")
