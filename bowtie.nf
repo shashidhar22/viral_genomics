@@ -21,17 +21,16 @@ process bowtie_Align {
   label 'high_mem'
   publishDir "$params.out_path/alignment/sam", mode : "copy"
   input:
-    tuple val(sample), path(fastq_path)
+    tuple val(sample), path(fastq_path), path(bowtie_index)
+
   output:
     tuple val(sample), path("${sample}.sam"), val("NA"), emit: sam_path
   script:
     r1 = fastq_path[0]
     r2 = fastq_path[1]
     """
-    bowtie2 -x $params.index.host.bowtie.genome/genome -1 ${r1} -2 ${r2} \
-    -S ${sample}.sam
+    bowtie2 -x ${bowtie_index}/genome -1 ${r1} -2 ${r2} -S ${sample}.sam
     """
-    
 }
 
 workflow {
