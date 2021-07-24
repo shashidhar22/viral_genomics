@@ -32,11 +32,11 @@ workflow removeHostAndAssemble {
 
   main:
     bbduk(fastq_path, adapter_path)
-    bowtie_Align(bbduk.out.trimmed_reads)
+    bowtie_Align(bbduk.out.trimmed_reads.combine(index_path))
     sam_to_bam(bowtie_Align.out.sam_path)
     bam_sort(sam_to_bam.out.bam_files)
     keep_unaligned(bam_sort.out.sorted_bam_file)
-    spades(keep_unaligned.out.filtered_reads)
+    spades(keep_unaligned.out.filtered_reads.combine(org_reference_path))
     quast(spades.out.genome_assembly, org_reference_path)
 }
 
