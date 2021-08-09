@@ -1,9 +1,9 @@
 nextflow.enable.dsl=2
 
 process indexBowtie{
-  module "Singularity"
-  container "$params.container.bowtie2"
+  container "$params.bowtie2"
   label 'high_mem'
+  errorStrategy 'retry'
   publishDir "$params.out_path/index/bowtie", mode : "copy"
   input:
     path reference_fasta
@@ -18,26 +18,41 @@ process indexBowtie{
 
 
 process bowtie_Align {
-  //module "Singularity"
-  //container "$params.containers.bowtie2"
-  module "Bowtie2"
+  container "$params.bowtie2"
   label 'high_mem'
+  errorStrategy 'retry'
   publishDir "$params.out_path/alignment/sam", mode : "copy"
   input:
-    each fastq_path
-    path bowtie_index
+    tuple val(sample), path(fastq_path), path(bowtie_index)
+
   output:
-    tuple val(sample), path("${sample}.sam"), val("NA"), emit: sam_path
+    tuple val(sample), path("${sample}.sam"), emit: sam_path
   script:
-    sample = fastq_path[0]
-    r1 = fastq_path[1][0]
-    r2 = fastq_path[1][1]
-    
+    r1 = fastq_path[0]
+    r2 = fastq_path[1]
     """
-    bowtie2 -x ${bowtie_index}/genome -1 ${r1} -2 ${r2} -S ${sample}.sam
+    bowtie2 --very-sensitive-local -x ${bowtie_index}/genome -1 ${r1} -2 ${r2} -S ${sample}.sam > stdout.log 2> stderr.log  
     """
-    
 }
+
+process align_ebv {
+  container "$params.bowtie2"
+  errorStrategy 'retry'
+  label 'high_mem'
+  publishDir "$params.out_path/alignment/ebv/sam", mode : "copy"
+  input:
+    tuple val(sample), path(fastq_path), path(bowtie_index)
+
+  output:
+    tuple val(sample), path("${sample}.sam"), emit: sam_path
+  script:
+    r1 = fastq_path[0]
+    r2 = fastq_path[1]
+    """
+    bowtie2 --very-sensitive-local -x ${bowtie_index}/genome -1 ${r1} -2 ${r2} -S ${sample}.sam > stdout.log 2> stderr.log  
+    """
+}
+
 
 workflow {
   fastq_path = Channel.fromFilePairs(params.fastq_path, size: -1)
