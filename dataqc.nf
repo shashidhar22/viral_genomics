@@ -3,6 +3,7 @@ nextflow.enable.dsl=2
 
 process runFastqc {
   container "$params.fastqc"
+  errorStrategy 'retry'
   label 'low_mem'
   publishDir "$params.out_path/fastqc/${mode}", mode : "copy"
   input:
@@ -23,12 +24,13 @@ process runFastqc {
     else if (mode == "trimmed")
       """
       cat ${rone} ${rtwo} > ${sample}.fastq
-      fastqc -q ${sample}.fastq
+      fastqc -q ${sample}.fastq > stdout.log 2> stderr.log
       """
 }
 
 process runMultiQC {
   container "$params.multiqc"
+  errorStrategy 'retry'
   label 'low_mem'
   publishDir "$params.out_path/mutli_qc", mode : "copy"
   input:
@@ -42,24 +44,57 @@ process runMultiQC {
     
 }
 
-process quast {
+process prep_quast {
   container "$params.quast"
-  label 'low_mem'
-  publishDir "$params.out_path/quast", mode : "copy"
+  errorStrategy 'retry'
+  label 'mid_mem'
+  publishDir "$params.out_path/contigs", mode : "copy"
   input:
-    each genome_assembly
-    path reference_genome
+    tuple val(sample), path(genome_assembly)
   output:
-    path "${sample}", emit: quast
+    path("${sample}.fasta"), emit: quast_inputs
   script:
     memory = "$task.memory" =~ /\d+/
-    sample = genome_assembly.getParent().getSimpleName()
     """
-    quast.py ${genome_assembly} -r ${reference_genome}  -o ${sample}
+    cp ${genome_assembly}/contigs.fasta ${sample}.fasta
     """
     
 }
 
+
+process quast {
+  container "$params.quast"
+  errorStrategy 'retry'
+  label 'mid_mem'
+  publishDir "$params.out_path/quast", mode : "copy"
+  input:
+    val mode
+    path genome_assemblies
+    path reference_genome
+  output:
+    path "${mode}", emit: quast
+  script:
+    memory = "$task.memory" =~ /\d+/
+    """
+    quast.py -r ${reference_genome}/genome.fa  -o ${mode} *.fasta > stdout.log 2> stderr.log
+    """
+    
+}
+
+process getFastq {
+  module "SRA-Toolkit"
+  errorStrategy 'retry'
+  label 'low_mem'
+  publishDir "$params.public_fastq", mode : "copy"
+  input:
+    each sra_number
+  output:
+    tuple val(sra_number), path("*.fastq") , emit: public_fastq
+  script:
+    """
+    fasterq-dump ${sra_number} --split-3 -m 4GB -e 20 -L 0
+    """
+}
 
 /*workflow {
   fastq_paths = Channel.fromFilePairs(params.fastq_paths, size: 4)
