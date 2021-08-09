@@ -2,6 +2,7 @@ nextflow.enable.dsl=2
 
 process sam_to_bam {
   container "$params.samtools"
+  errorStrategy 'retry'
   label 'low_mem'
   publishDir "$params.out_path/alignment/bam/", mode : "copy"
   input:
@@ -17,6 +18,7 @@ process sam_to_bam {
 
 process bam_sort {
   container "$params.samtools"
+  errorStrategy 'retry'
   label 'high_mem'
   publishDir "$params.out_path/alignment/sorted/", mode : "copy", pattern: "*_sorted.ba*"
   input:
@@ -34,6 +36,7 @@ process bam_sort {
 
 process idxstats {
   container "$params.samtools"
+  errorStrategy 'retry'
   label 'low_mem'
   publishDir "$params.out_path/idxstats/", mode : "copy"
   input:
@@ -48,22 +51,27 @@ process idxstats {
 
 process coverage {
   container "$params.samtools"
-  label 'low_mem'
+  errorStrategy 'retry'
+  label 'mid_mem'
   publishDir "$params.out_path/coverage/", mode : "copy"
   input:
-    tuple val(sample), path(bam_file), path(index_file)
+    tuple val(sample), path(sam_file)
   output:
     path "${sample}_coverage.txt", emit: coverage_output
   script:
     """
-    samtools coverage -Q 30 -q 20 -o ${sample}_coverage.txt ${bam_file}
+    samtools view -S -b ${sam_file} > ${sample}.bam
+    samtools sort ${sample}.bam -o ${sample}_sorted.bam
+    samtools index ${sample}_sorted.bam ${sample}_sorted.bai
+    samtools coverage -Q 30 -q 20 -o ${sample}_coverage.txt ${sample}_sorted.bam
     """
 }
 
 process keep_unaligned {
   container "$params.samtools"
-  label 'low_mem'
-  publishDir "$params.out_path/coverage/", mode : "copy"
+  errorStrategy 'retry'
+  label 'mid_mem'
+  publishDir "$params.out_path/unaligned/", mode : "copy"
   input:
     tuple val(sample), path(bam_file), path(index_file)
   output:
@@ -72,7 +80,7 @@ process keep_unaligned {
     """
     samtools fastq ${bam_file}\
       --threads ${task.cpus} \
-      -1 ${sample}_R1_filtered.fq.gz -2 ${sample}_R2_filtered.fq.gz    
+      -1 ${sample}_R1_filtered.fq.gz -2 ${sample}_R2_filtered.fq.gz > stdout.log 2> stderr.log
     """
 }
 
