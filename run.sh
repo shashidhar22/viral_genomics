@@ -6,7 +6,7 @@ set -Eeuo pipefail
 NXF_VER=20.10.0
 
 # Nextflow Configuration File
-NXF_CONFIG=nextflow.config
+NXF_CONFIG=path_to_nextflow_config.config
 
 # Workflow to Run (e.g. GitHub repository)
 WORKFLOW_REPO=main.nf #shashidhar22/viral_genomics
@@ -29,6 +29,7 @@ nextflow \
     -c ${NXF_CONFIG} \
     ${WORKFLOW_REPO} \
     -entry removeHostAndAssemble \
-    -w /fh/scratch/delete90/warren_h/ebv_enktl \
-    -params-file main.yaml \
+    -w path_to_work_dir \
+    -with-tower \
+    -params-file path_to_yaml.yaml \
     -resume
