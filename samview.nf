@@ -84,6 +84,20 @@ process keep_unaligned {
     """
 }
 
+process mpileup {
+  container "$params.samtools"
+  errorStrategy 'retry'
+  label 'high_mem'
+  publishDir "$params.out_path/mpileup/", mode : "copy"
+  input:
+    tuple val(sample), path(bam_file), path(index_file), path(reference)
+  output:
+    tuple val(sample), path("${sample}_mpileup.txt"), emit: mpileup_output
+  script:
+    """
+    samtools mpileup -f ${reference}/genome.fa -q 20 -Q 30 -a -o ${sample}_mpileup.txt ${bam_file}
+    """
+}
 workflow {
   bowtie_align = Channel.fromPath(params.bowtie_align)
   out_path = Channel.from(params.out_path)
