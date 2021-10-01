@@ -5,12 +5,16 @@ process spades {
   //module "SPAdes"
   label 'high_mem'
   errorStrategy 'retry'
-  publishDir "$params.out_path/genome_assembly/$params.assembly_type", mode : "copy", pattern : "${sample}"
-  publishDir "$params.out_path/contigs/$params.assembly_type/", mode : "copy", pattern : "${sample}.fasta"
+  publishDir "$params.out_path/genome_assembly/$params.assembly_type/${sample}", 
+    mode : "copy", pattern : "${sample}/*fa*"
+  publishDir "$params.out_path/contigs/$params.assembly_type/", mode : "copy", 
+    pattern : "${sample}.fasta"
   input:
     tuple val(sample), path(trimmed_reads), path(org_reference)
   output:
-    tuple val(sample), path("${sample}/contigs.fasta"), path("${sample}/scaffolds.fasta"), emit: genome_assembly
+    tuple val(sample), path("${sample}/contigs.fasta"), 
+      path("${sample}/scaffolds.fasta"), path("${sample}/assembly_graph.fastg"),
+      path("${sample}/assembly_graph_with_scaffolds.gfa"), emit: genome_assembly
     path "${sample}.fasta", emit: contigs
   script:
     forward = trimmed_reads[0]
@@ -34,12 +38,15 @@ process unicycler {
   container "$params.unicycler"
   errorStrategy 'retry'
   label 'high_mem'
-  publishDir "$params.out_path/unicycler", mode : "copy", pattern : "${sample}"
-  publishDir "$params.out_path/contigs/unicycler/", mode : "copy", pattern : "${sample}.fasta"
+  publishDir "$params.out_path/genome_assembly/unicycler/${sample}", 
+    mode : "copy", pattern : "${sample}/assembly.*"
+  publishDir "$params.out_path/contigs/unicycler/", mode : "copy", 
+    pattern : "${sample}.fasta"
   input:
     tuple val(sample), path(trimmed_reads)
   output:
-    tuple val(sample), path("${sample}/assembly.fasta"), path("${sample}/assembly.gfa"), emit: unicycler
+    tuple val(sample), path("${sample}/assembly.fasta"), 
+      path("${sample}/assembly.gfa"), emit: unicycler
     path "${sample}.fasta", emit: contigs
   script:
     forward = trimmed_reads[0]
@@ -64,12 +71,32 @@ process abacas {
   script:
     """
     abacas.pl -r ${org_reference}/genome.fa -q ${unicycler} -p nucmer > stdout.log 2> stderr.log
-    awk '/^>/ {printf(">%s\\n",${sample});next;} {print}' assembly.fasta_genome.fa.fasta > ${sample}.fasta 
+    awk '/^>/ {printf(">%s\\n","${sample}");next;} {print}' assembly.fasta_genome.fa.fasta > ${sample}.fasta 
     """
 }
 
-
-
+process repeat_masker {
+  container "$params.repeatmasker"
+  label 'high_mem'
+  errorStrategy 'retry'
+  publishDir "$params.out_path/repeatmasker", mode : "copy", pattern : "${sample}.fasta*"
+  publishDir "$params.out_path/contigs/repeat_masked", mode : "copy", pattern : "${sample}.fasta.masked", saveAs: { "${sample}_masked.fasta"}
+  input:
+    each abacas_path
+    path repeat_table 
+  output:
+    path "${sample}.fasta.masked", emit: masked_fasta
+    path "${sample}_masked.fasta", emit: contigs
+    path "${sample}.fasta.cat", emit: repeat_catalog
+    path "${sample}.fasta.out", emit: repeat_output
+    path "${sample}.fasta.tbl", emit: repeat_table
+  script:
+    sample = abacas_path.getBaseName()
+    """
+    RepeatMasker -pa 4 -lib ${repeat_table} -s -e rmblast -dir ./ ${abacas_path} > stdout.log 2> stderr.log
+    cp ${sample}.fasta.masked ${sample}_masked.fasta
+    """
+}
 
 workflow {
   trim = Channel.fromFilePairs(params.trim, size: 2)
