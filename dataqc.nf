@@ -1,6 +1,21 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl=2
 
+// Run FASTQC on raw and trimmed FASTQ files
+//
+// PROCESS INPUTS:
+// - Tuple with sample name and path to FASTQ files
+//  (Source: fastq_paths/bbduk.out.trimmed_reads)
+// - Status of FASTQ files ("trimmed", "raw")
+//  (Source: "trimmed"/"raw")
+// PROCESS OUTPUTS:
+// - FASTQC report for FASTQ files
+// EMITTED CHANNELS:
+// - fastqc_results :- FASTQC reports
+//
+// NOTE: 
+//
+// TODO: 
 process runFastqc {
   container "$params.fastqc"
   errorStrategy 'retry'
@@ -28,6 +43,19 @@ process runFastqc {
       """
 }
 
+// Run MULTIQC
+//
+// PROCESS INPUTS:
+// - Paths to run MultiQC on
+//  (Source: )
+// PROCESS OUTPUTS:
+// - FASTQC report for FASTQ files
+// EMITTED CHANNELS:
+// - fastqc_results :- FASTQC reports
+//
+// NOTE: 
+//
+// TODO: 
 process runMultiQC {
   container "$params.multiqc"
   errorStrategy 'retry'
@@ -76,7 +104,7 @@ process quast {
   script:
     memory = "$task.memory" =~ /\d+/
     """
-    quast.py -r ${reference_genome}/genome.fa  -o ${mode} *.fasta > stdout.log 2> stderr.log
+    quast.py -r ${reference_genome}/genome.fa --glimmer -o ${mode} *.fasta > stdout.log 2> stderr.log
     """
     
 }
@@ -93,6 +121,25 @@ process getFastq {
   script:
     """
     fasterq-dump ${sra_number} --split-3 -m 4GB -e 20 -L 0
+    """
+}
+
+process generateFastq {
+  container "$params.art"
+  errorStrategy 'retry'
+  label 'low_mem'
+  publishDir "$params.out_path/simulated_reads", mode : "copy"
+  input:
+    each index
+    path reference_path
+  output:
+    tuple val(sample), path("*.fastq") , emit: sim_fastq
+  script:
+    sample = "simulated_data" + index
+    """
+    art_illumina -sam -i ${reference_path}/genome.fa -p -l 150 -f 100 -m 200 -s 10 -o ${sample} 
+    cp ${sample}1.fq ${sample}_R1.fastq
+    cp ${sample}2.fq ${sample}_R2.fastq
     """
 }
 
