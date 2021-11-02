@@ -1,14 +1,59 @@
 nextflow.enable.dsl=2
+include { runFastQC as fastqQCRaw ; runFastQC as fastqQCTrim ; runFastQC as fastQCEbv} from './dataqc'
 include { bbduk ; bbnorm } from './trim_reads'
-include { runFastqc; runMultiQC; quast; quast as quast_masker; quast as quast_uniclyer; quast as quast_abacas ; getFastq ; generateFastq} from './dataqc'
-include { bowtie_Align; align_ebv; align_filtered_ebv ; align_filtered_ebv as align_sampled_ebv} from './bowtie'
+include { hostRemoval } from './bowtie'
+include { abacas as abacasSpades ; abacas as abacasUnicycler} from './spades'
+include { prokka as prokkaSpades ; prokka as prokkaUnicycler } from './annotation'
+include { runFastQC; runMultiQC; quast; quast as quast_masker; quast as quast_uniclyer; quast as quast_abacas ; getFastq ; generateFastq} from './dataqc'
+//include { bowtie_Align; align_ebv; align_filtered_ebv ; align_filtered_ebv as align_sampled_ebv} from './bowtie'
 include { sam_to_bam;bam_sort;coverage;keep_unaligned;mpileup } from './samview'
-include { kmer_count } from './khmer'
 include { spades; unicycler; abacas; repeat_masker } from './spades'
 include { coverage as ebv_coverage } from './samview'
 include { haplotype_caller; cnn_score_variants ; annotate_vcfs} from './variant_calling'
 include { call_host_variants; generate_gvcf_table; consolidate_gvcfs; genotype_gvcfs ; variant_scoring } from './variant_calling'
-include { prokka } from './annotation'
+include { prokka ; prokka as prokka_spades ; prokka as prokka_abacas} from './annotation'
+
+workflow ebvAssembly {
+  fastq_path = Channel.fromFilePairs(params.fastq_path, size: 4)
+  adapter_path = Channel.fromPath(params.adapters)
+  out_path = Channel.fromPath(params.out_path)
+  ebv_reference = Channel.fromPath(params.references.organism.ebv_1_ref + '/genome.fa')
+  human_reference = Channel.fromPath(params.references.host.sans_ebv + '/genome.fa')
+  ebv_index = Channel.fromPath(params.references.organism.ebv_1_ref)
+  human_index = Channel.fromPath(params.references.host.sans_ebv)
+  multi_config = Channel.fromPath(params.multiqc_config)
+  main:
+    //Run FastQC on raw read
+    fastqQCRaw(fastq_path, "raw")
+    // Trim adapters and low quality reads
+    bbduk(fastq_path)
+    // FastQC on trimmed reads
+    fastqQCTrim(bbduk.out.trimmed_reads, "trimmed")
+    // Align sequences to host genome, extract unalgined reads, align these
+    // to the EBV genome, remove PCR duplicates, and extract the EBV reads
+    hostRemoval(bbduk.out.trimmed_reads.combine(human_index).combine(ebv_index))
+    // FastQC on EBV specific reads
+    fastQCEbv(hostRemoval.out.deduped_reads, "host_removed")
+    // Generate a multiQC report
+    runMultiQC(fastqQCRaw.out.fastqc_results.toSortedList(), 
+      fastqQCTrim.out.fastqc_results.toSortedList(), 
+      bbduk.out.trimmed_stats.toSortedList(), 
+      hostRemoval.out.host_alignment_stats.toSortedList(),
+      hostRemoval.out.ebv_alignment_stats.toSortedList(),
+      fastQCEbv.out.fastqc_results.toSortedList(),
+      multi_config)
+    // Run spades on the EBV reads
+    spades(hostRemoval.out.unaligned_reads)
+    // Run unicycler on the EBV reads
+    unicycler(hostRemoval.out.unaligned_reads)
+    abacasSpades(spades.out.contigs, "spades")
+    abacasUnicycler(unicycler.out.contigs, "unicycler")
+    prokkaSpades(abacasSpades.out.contigs, "spades")
+    prokkaUnicycler(abacasUnicycler.out.contigs, "unicycler")
+}
+
+
+
 
 workflow alignAndCoverage {
   fastq_path = Channel.fromFilePairs(params.fastq_path, size: 4)
@@ -40,35 +85,31 @@ workflow removeHostAndAssemble {
   host_reference_path = Channel.from(params.references.host.sans_unplacedebv)
   org_reference_path = Channel.from(params.references.organism.ebv_1_ref)
   org_index_path = Channel.fromPath(params.index.organism.bowtie.ebv_1_ref)
-  
   main:
-    getFastq(public_list)
-    generateFastq(simulated_reads, org_reference_path)
-    bbduk(fastq_path.concat(generateFastq.out.sim_fastq).combine(adapter_path))
+    //getFastq(public_list)
+    //generateFastq(simulated_reads, org_reference_path)
+    bbduk(fastq_path.combine(adapter_path))
     bowtie_Align(bbduk.out.trimmed_reads.combine(index_path))
-    coverage(bowtie_Align.out.sam_path)
     sam_to_bam(bowtie_Align.out.sam_path)
     bam_sort(sam_to_bam.out.bam_files)
     keep_unaligned(bam_sort.out.sorted_bam_file)
-    align_ebv(bbduk.out.trimmed_reads.concat(generateFastq.out.sim_fastq).combine(org_index_path))
+    align_ebv(bbduk.out.trimmed_reads.combine(org_index_path))
     align_filtered_ebv(keep_unaligned.out.filtered_reads.combine(org_index_path))
     haplotype_caller(align_filtered_ebv.out.sam_path.combine(org_reference_path))
     cnn_score_variants(haplotype_caller.out.vcf_paths.combine(org_reference_path))
     annotate_vcfs(cnn_score_variants.out.annotated_vcf_paths)
     bbnorm(keep_unaligned.out.filtered_reads)
     align_sampled_ebv(bbnorm.out.sampled_reads.combine(org_index_path))
-    //ebv_coverage(align_filtered_ebv.out.sam_path)
     spades(bbnorm.out.sampled_reads.combine(org_reference_path))
-    //quast_prep(spades.out.genome_assembly)
     quast("Spades", spades.out.contigs.toSortedList(), org_reference_path)
-    unicycler(seqtk.out.sampled_reads)
+    unicycler(bbnorm.out.sampled_reads)
     quast_uniclyer("Unicycler", unicycler.out.contigs.toSortedList().unique(), org_reference_path)
     abacas(unicycler.out.unicycler.combine(org_reference_path))
     quast_abacas("Abacas", abacas.out.contigs.toSortedList(), org_reference_path)    
     repeat_masker(abacas.out.contigs.concat(public_contigs), ebv_repeat)
     quast_masker("RepeatMasker", repeat_masker.out.contigs.toSortedList(), org_reference_path)
     mpileup(align_sampled_ebv.out.sam_path.combine(org_reference_path))
-    prokka(unicycler.out.contigs)
+    prokka(unicycler.out.contigs,"Unicycler")
 }
 
 
