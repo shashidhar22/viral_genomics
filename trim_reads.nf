@@ -18,27 +18,28 @@ nextflow.enable.dsl=2
 process bbduk {
   errorStrategy 'retry'
   container "$params.bbmap"
-  label 'mid_mem'
+  label 'high_mem'
   publishDir "$params.out_path/trimmed_reads/", mode : "copy"
   input:
-    tuple val(sample), path(fastq_path), path(adapters)
+    tuple val(sample), path(fastq_path)
   output:
     tuple val(sample), path("*clean.fq"), emit: trimmed_reads
+    path "${sample}_bbduk_stats.txt", emit: trimmed_stats
   script:
   if ( fastq_path.size() == 2 )
     """
-    bbduk.sh in1=${fastq_path[0]} in2=${fastq_path[1]} \
+    bbduk.sh -Xmx400g in1=${fastq_path[0]} in2=${fastq_path[1]} \
     out1=${sample}_R1.clean.fq out2=${sample}_R2.clean.fq \
-    ref=${adapters}\
+    ref=adapters qtrim=rl minlength=100 stats=${sample}_bbduk_stats.txt \
     ktrim=r k=23 mink=11 hdist=1 tpe=f tbo=t > stdout.log 2> stderr.log
     """
   else
     """
     zcat ${fastq_path[0]} ${fastq_path[2]} > ${sample}_R1.fastq 
     zcat ${fastq_path[1]} ${fastq_path[3]} > ${sample}_R2.fastq 
-    bbduk.sh in1=${sample}_R1.fastq in2=${sample}_R2.fastq \
-    out1=${sample}_R1.clean.fq out2=${sample}_R2.clean.fq \
-    ref=${adapters}\
+    bbduk.sh -Xmx400g in1=${sample}_R1.fastq in2=${sample}_R2.fastq \
+    out1=${sample}_R1.clean.fq out2=${sample}_R2.clean.fq stats=${sample}_bbduk_stats.txt\
+    ref=adapters qtrim=rl minlength=100 \
     ktrim=r k=23 mink=11 hdist=1 tpe=f tbo=t > stdout.log 2> stderr.log
     """
 } 
@@ -59,7 +60,7 @@ process bbduk {
 // NOTE: 
 //
 // TODO: 
-process seqtk {
+process bbnorm {
   errorStrategy 'retry'
   container "$params.bbmap"
   label 'mid_mem'
