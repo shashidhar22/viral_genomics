@@ -53,9 +53,9 @@ process coverage {
   container "$params.samtools"
   errorStrategy 'retry'
   label 'mid_mem'
-  publishDir "$params.out_path/coverage/", mode : "copy"
+  publishDir "$params.out_path/coverage/${organism}", mode : "copy"
   input:
-    tuple val(sample), path(sam_file)
+    tuple val(sample), path(sam_file), val(organism)
   output:
     path "${sample}_coverage.txt", emit: coverage_output
   script:
