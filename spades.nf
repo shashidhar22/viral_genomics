@@ -67,13 +67,14 @@ process abacas {
   input:
     each path(assembly)
     val mode
+    path org_reference
   output:
     path "${sample}.fasta", emit: contigs
   script:
     sample = assembly.getSimpleName()
     """
     abacas.pl -r ${org_reference}/genome.fa -q ${assembly} -p nucmer > stdout.log 2> stderr.log
-    awk '/^>/ {printf(">%s\\n","${sample}");next;} {print}' assembly.fasta_genome.fa.fasta > ${sample}.fasta 
+    awk '/^>/ {printf(">%s\\n","${sample}");next;} {print}' ${sample}.fasta_genome.fa.fasta > ${sample}.fasta 
     """
 }
 
