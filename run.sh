@@ -28,7 +28,7 @@ nextflow \
     run \
     -c ${NXF_CONFIG} \
     ${WORKFLOW_REPO} \
-    -entry removeHostAndAssemble \
+    -entry ebvAssembly \
     -w path_to_work_dir \
     -with-tower \
     -params-file path_to_yaml.yaml \
