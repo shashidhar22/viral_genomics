@@ -6,10 +6,11 @@ process prokka {
   label 'high_mem'
   scratch '/fh/scratch/delete30/warren_h/ebv_enktl'
   errorStrategy 'retry'
-  publishDir "$params.out_path/genome_annotation/${sample}", 
+  publishDir "$params.out_path/genome_annotation/${assembly_mode}/${sample}", 
     mode : "copy"
   input:
-    path assembled_genome
+    each path(assembled_genome)
+    val assembly_mode
   output:
     path "${sample}", emit: gene_annotation
   script:
