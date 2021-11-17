@@ -46,8 +46,8 @@ workflow ebvAssembly {
     spades(hostRemoval.out.unaligned_reads)
     // Run unicycler on the EBV reads
     unicycler(hostRemoval.out.unaligned_reads)
-    abacasSpades(spades.out.contigs, "spades")
-    abacasUnicycler(unicycler.out.contigs, "unicycler")
+    abacasSpades(spades.out.contigs, "spades", ebv_index)
+    abacasUnicycler(unicycler.out.contigs, "unicycler", ebv_index)
     prokkaSpades(abacasSpades.out.contigs, "spades")
     prokkaUnicycler(abacasUnicycler.out.contigs, "unicycler")
 }
