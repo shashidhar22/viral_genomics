@@ -58,16 +58,18 @@ process hostRemoval {
   publishDir "$params.out_path/host/alignment/", mode : "copy", pattern : "*.ba*"
   publishDir "$params.out_path/organism/unaligned_reads/", mode: "copy", pattern : "*filtered.fq.gz"
   publishDir "$params.out_path/organism/deduplicated_reads/", mode: "copy", pattern : "*deduped.fq.gz"
+  publishDir "$params.out_path/alignment_reports/", mode: "copy", pattern : "*txt"
 
   input:
     tuple val(sample), path(fastq_path), path(bowtie_index), path(org_index)
   output:
     tuple val(sample), path("${sample}_*_filtered.fq"), emit: unaligned_reads
-    tuple val(sample), path("${sample}_*_deduped.fq"), emit: deduped_reads
+    tuple val(sample), path("${sample}_*_deduped_unrep.fq"), emit: deduped_reads
     path "${sample}_host_sorted.ba*", emit: host_bam
     path "${sample}_host_alignment.txt", emit: host_alignment_stats
     path "${sample}_ebv_alignment.txt", emit: ebv_alignment_stats
     path "${sample}_ebv_host_alignment.txt", emit: ebv_host_alignment_stats
+    path "${sample}_ebv_dedup.ba*" , emit: ebv_dedup_bam
   script:
     r1 = fastq_path[0]
     r2 = fastq_path[1]
@@ -83,7 +85,7 @@ process hostRemoval {
     samtools fastq -G 1024 ${sample}_unmapped_sorted.bam \
       --threads ${task.cpus} \
       -1 ${sample}_R1_filtered.fq -2 ${sample}_R2_filtered.fq > stdout.log 2> stderr.log
-    samtools fastq ${sample}_host_sorted.bam \
+    samtools fastq -f 3 ${sample}_host_sorted.bam \
       --threads ${task.cpus} \
       -1 ${sample}_R1_host.fq -2 ${sample}_R2_host.fq > stdout.log 2> stderr.log
     bowtie2 --very-sensitive-local -x ${org_index}/genome \
@@ -94,9 +96,9 @@ process hostRemoval {
     samtools sort -o ${sample}_ebv_sorted.bam ${sample}_ebv_mapped_fixmate.bam
     samtools markdup -r ${sample}_ebv_sorted.bam ${sample}_ebv_dedup.bam
     samtools index ${sample}_ebv_dedup.bam ${sample}_ebv_dedup.bai
-    samtools fastq -G 1025 ${sample}_ebv_dedup.bam \
+    samtools fastq -f 3 ${sample}_ebv_dedup.bam \
       --threads ${task.cpus} \
-      -1 ${sample}_R1_deduped.fq -2 ${sample}_R2_deduped.fq \
+      -1 ${sample}_R1_deduped_unrep.fq -2 ${sample}_R2_deduped_unrep.fq \
       > stdout.log 2> stderr.log
     bowtie2 --very-sensitive-local -x ${org_index}/genome \
       -1 ${sample}_R1_host.fq -2 ${sample}_R2_host.fq \

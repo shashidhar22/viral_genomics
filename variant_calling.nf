@@ -24,11 +24,14 @@ process haplotype_caller {
   label 'mid_mem'
   publishDir "$params.out_path/variant_calls/${sample}/", mode : "copy"
   input:
-    tuple val(sample), path(bam_file), path(index_file), path(reference_path)
+    each path(bam_path)
+    path reference_path
   output:
-    tuple val(sample), path("${sample}.vcf.gz"), path("${sample}.vcf.gz.tbi"), emit: vcf_paths
+    path "${sample}.vcf.gz*" , emit: vcf_paths
     
   script:
+    def bam_file = bam_path[1]
+    sample =  bam_file.getSimpleName().replaceAll(/_ebv_dedup/, "")
     """
     gatk AddOrReplaceReadGroups \
       -I ${bam_file} \
@@ -42,7 +45,7 @@ process haplotype_caller {
       -R ${reference_path}/genome.fa \
       -I ${sample}_rg.bam \
       -ploidy 1 \
-      -O ${sample}.vcf.gz  > stdout.log 2> stderr.log  
+      --output ${sample}.vcf.gz  > stdout.log 2> stderr.log 
     """
 }
 
@@ -70,14 +73,17 @@ process cnn_score_variants {
   label 'mid_mem'
   publishDir "$params.out_path/variant_calls/${sample}/", mode : "copy"
   input:
-    tuple val(sample), path(vcf_path), path(index_path), path(reference_path)
+    each path(vcf_path)
+    path reference_path
   output:
-    tuple val(sample), path("${sample}_annotated.vcf"), emit: annotated_vcf_paths
+    path "${sample}_annotated.vcf", emit: annotated_vcf_paths
   script:
+    def vcf_file = vcf_path[0]
+    sample = vcf_file.getSimpleName()
     """
     mkdir temp_dir
     gatk CNNScoreVariants \
-      -V ${vcf_path} \
+      -V ${vcf_file} \
       -R ${reference_path}/genome.fa \
       --tmp-dir temp_dir \
       -O ${sample}_annotated.vcf > stdout.log 2> stderr.log
@@ -103,17 +109,22 @@ process cnn_score_variants {
 //
 // TODO: Create a conda environment for SnpEff (ebv_env.yml)
 process annotate_vcfs {
-  conda "/home/sravisha/.conda/envs/ebv_enktl"
+  conda "~/.conda/envs/ebv_enktl"
   errorStrategy 'retry'
   label 'mid_mem'
   publishDir "$params.out_path/variant_calls/${sample}/", mode : "copy"
   input:  
-    tuple val(sample), path(annotated_vcf_path) 
+    each path(vcf_path) 
   output:
-    tuple val(sample), path("${sample}_snpeff.vcf"), path("${sample}_summary.html"), emit: snpeff_vcf_paths
+    path "${sample}_snpeff.vcf" , emit: snpeff_vcf_paths
+    path "${sample}_summary.html" , emit: snpeff_vcf_summary
+    path "${sample}_snpeff.tsv", emit: snpeff_vcf_tsv
   script:
+    sample = vcf_path.getSimpleName().replaceAll("_annotated", "")
     """
-    snpEff -v ebv -s ${sample}_summary.html ${annotated_vcf_path} > ${sample}_snpeff.vcf
+    snpEff -v ebv -s ${sample}_summary.html ${vcf_path} > ${sample}_snpeff.vcf
+    cat ${sample}_snpeff.vcf | ~/.conda/pkgs/snpsift-4.3.1t-hdfd78af_3/share/snpsift-4.3.1t-3/scripts/vcfEffOnePerLine.pl  > ${sample}_oneperline.vcf 
+    SnpSift extractFields ${sample}_oneperline.vcf CHROM POS REF ALT "ANN[*].EFFECT" "ANN[*].GENE" "ANN[*].HGVS_P" > ${sample}_snpeff.tsv 
     """
 }
 
@@ -139,11 +150,15 @@ process call_host_variants {
   label 'mid_mem'
   publishDir "$params.out_path/host_variant_calls/", mode : "copy"
   input:
-    tuple val(sample), path(bam_file), path(index_file), path(reference_path)
+    each path(bam_file)
+    path reference_path
   output:
     path "${sample}.g.vcf.gz", emit: gvcf_paths
     path "${sample}.g.vcf.gz.tbi", emit: gvcf_index_paths
   script:
+    def bam_path = bam_file[0]
+    def bam_index_path = bam_file[1]
+    def sample =  ${bam_path}.replaceAll(/_ebv_dedup.bam/, "")
     """
     gatk --java-options "-Xmx4g" HaplotypeCaller \
       -R ${reference_path}/genome.fa \

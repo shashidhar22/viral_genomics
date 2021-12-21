@@ -1,9 +1,15 @@
 nextflow.enable.dsl=2
-include { runFastQC as fastqQCRaw ; runFastQC as fastqQCTrim ; runFastQC as fastQCEbv} from './dataqc'
+include { runFastQC as fastqQCPublic ; runFastQC as fastqQCRaw ; runFastQC as fastqQCTrim ; runFastQC as fastQCEbv} from './dataqc'
 include { bbduk ; bbnorm } from './trim_reads'
 include { hostRemoval } from './bowtie'
+include { repairFastq } from './dataqc'
 include { abacas as abacasSpades ; abacas as abacasUnicycler} from './spades'
 include { prokka as prokkaSpades ; prokka as prokkaUnicycler } from './annotation'
+include { quast as quastSpades ; quast as quastUnicycler } from './dataqc'
+include { haplotype_caller as haplotypeCaller} from './variant_calling'
+include { cnn_score_variants as cnnScoreVariants} from './variant_calling'
+include { annotate_vcfs as annotateVCFs} from './variant_calling'
+include { biosino_download } from './data_download'
 include { runFastQC; runMultiQC; quast; quast as quast_masker; quast as quast_uniclyer; quast as quast_abacas ; getFastq ; generateFastq} from './dataqc'
 //include { bowtie_Align; align_ebv; align_filtered_ebv ; align_filtered_ebv as align_sampled_ebv} from './bowtie'
 include { sam_to_bam;bam_sort;coverage;keep_unaligned;mpileup } from './samview'
@@ -15,6 +21,7 @@ include { prokka ; prokka as prokka_spades ; prokka as prokka_abacas} from './an
 
 workflow ebvAssembly {
   fastq_path = Channel.fromFilePairs(params.fastq_path, size: 4)
+  biosino_data = Channel.fromPath(params.biosino_metadata)
   adapter_path = Channel.fromPath(params.adapters)
   out_path = Channel.fromPath(params.out_path)
   ebv_reference = Channel.fromPath(params.references.organism.ebv_1_ref + '/genome.fa')
@@ -23,8 +30,14 @@ workflow ebvAssembly {
   human_index = Channel.fromPath(params.references.host.sans_ebv)
   multi_config = Channel.fromPath(params.multiqc_config)
   main:
+    // Download biosino data
+    //biosino_download(biosino_data.splitCsv(header: true, sep: '\t'))
     //Run FastQC on raw read
     fastqQCRaw(fastq_path, "raw")
+    //fastqQCPublic(biosino_download.out.fastq_files.groupTuple(), "public")
+    // Merge fastq channels
+    //fastq_data = fastq_path.join(biosino_download.out.fastq_files, 
+    //  remainder: true)
     // Trim adapters and low quality reads
     bbduk(fastq_path)
     // FastQC on trimmed reads
@@ -34,6 +47,16 @@ workflow ebvAssembly {
     hostRemoval(bbduk.out.trimmed_reads.combine(human_index).combine(ebv_index))
     // FastQC on EBV specific reads
     fastQCEbv(hostRemoval.out.deduped_reads, "host_removed")
+    // Repair the deduplicated EBV reads to appear as ordered pairs
+    repairFastq(hostRemoval.out.deduped_reads)
+    // Run spades on the EBV reads
+    spades(repairFastq.out.repaired_fastq)
+    // Run unicycler on the EBV reads
+    unicycler(repairFastq.out.repaired_fastq)
+    abacasSpades(spades.out.contigs, "spades", ebv_index)
+    abacasUnicycler(unicycler.out.contigs, "unicycler", ebv_index)
+    prokkaSpades(abacasSpades.out.abacas_contigs, "spades")
+    prokkaUnicycler(abacasUnicycler.out.abacas_contigs, "unicycler")
     // Generate a multiQC report
     runMultiQC(fastqQCRaw.out.fastqc_results.toSortedList(), 
       fastqQCTrim.out.fastqc_results.toSortedList(), 
@@ -41,15 +64,16 @@ workflow ebvAssembly {
       hostRemoval.out.host_alignment_stats.toSortedList(),
       hostRemoval.out.ebv_alignment_stats.toSortedList(),
       fastQCEbv.out.fastqc_results.toSortedList(),
+      prokkaSpades.out.gene_annotation.toSortedList(),
+      prokkaUnicycler.out.gene_annotation.toSortedList(),
       multi_config)
-    // Run spades on the EBV reads
-    spades(hostRemoval.out.unaligned_reads)
-    // Run unicycler on the EBV reads
-    unicycler(hostRemoval.out.unaligned_reads)
-    abacasSpades(spades.out.contigs, "spades", ebv_index)
-    abacasUnicycler(unicycler.out.contigs, "unicycler", ebv_index)
-    prokkaSpades(abacasSpades.out.contigs, "spades")
-    prokkaUnicycler(abacasUnicycler.out.contigs, "unicycler")
+    // Run quast on the EBV assembly
+    quastSpades(abacasSpades.out.abacas_contigs.toSortedList(), ebv_index, "spades")
+    quastUnicycler(abacasUnicycler.out.abacas_contigs.toSortedList(), ebv_index, "unicycler")
+    haplotypeCaller(hostRemoval.out.ebv_dedup_bam, ebv_index)
+    cnnScoreVariants(haplotypeCaller.out.vcf_paths, ebv_index)
+    annotateVCFs(cnnScoreVariants.out.annotated_vcf_paths)
+
 }
 
 
