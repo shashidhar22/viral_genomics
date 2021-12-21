@@ -36,7 +36,7 @@ process runFastQC {
       zcat ${rone} ${rtwo} ${rthree} ${rfour} > ${sample}_${mode}.fastq
       fastqc -q ${sample}_${mode}.fastq  > stdout.txt 2> stderr.txt
       """
-    else if (mode == "trimmed" | mode == "host_removed")
+    else if (mode == "trimmed" | mode == "host_removed" | mode == "public")
       """
       cat ${rone} ${rtwo} > ${sample}_${mode}.fastq
       fastqc -q ${sample}_${mode}.fastq  > stdout.txt 2> stderr.txt
@@ -68,6 +68,8 @@ process runMultiQC {
     path host_bowtie_stats
     path ebv_bowtie_stats
     path ebv_fastqc_out
+    path prokka_spades
+    path prokka_unicycler 
     path config
   output:
     path "multiqc_report.html", emit: mutli_qc_out
@@ -102,15 +104,15 @@ process quast {
   label 'mid_mem'
   publishDir "$params.out_path/quast", mode : "copy"
   input:
-    val mode
     path genome_assemblies
     path reference_genome
+    val mode
   output:
     path "${mode}", emit: quast
   script:
     memory = "$task.memory" =~ /\d+/
     """
-    quast.py -r ${reference_genome}/genome.fa --glimmer -o ${mode} *.fasta > stdout.log 2> stderr.log
+    quast.py -r ${reference_genome}/genome.fa --circos --glimmer -o ${mode} *.fasta > stdout.log 2> stderr.log
     """
     
 }
@@ -146,6 +148,22 @@ process generateFastq {
     art_illumina -sam -i ${reference_path}/genome.fa -p -l 150 -f 100 -m 200 -s 10 -o ${sample} 
     cp ${sample}1.fq ${sample}_R1.fastq
     cp ${sample}2.fq ${sample}_R2.fastq
+    """
+}
+
+process repairFastq {
+  container "$params.bbmap"
+  errorStrategy 'retry'
+  label 'low_mem'
+  publishDir "$params.out_path/ebv_reads", mode : "copy"
+  input:
+    tuple val(sample), path(ebv_dedup_reads)
+  output:
+    tuple val(sample), path("*.fastq") , emit: repaired_fastq
+  script:
+    """
+    repair.sh in=${sample}_R1_deduped_unrep.fq in2=${sample}_R2_deduped_unrep.fq \
+    out=${sample}_R1_deduped.fastq out2=${sample}_R2_deduped.fastq
     """
 }
 
