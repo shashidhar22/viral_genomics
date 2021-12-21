@@ -1,0 +1,96 @@
+data_format: "yaml"
+
+max_table_rows: 10000
+
+run_modules:
+  - custom_content
+  - fastqc
+  - bbmap
+  - fastp
+  - kraken
+  - bowtie2
+  - samtools
+  - mosdepth
+  - bcftools
+  - snpeff
+  - quast
+  - pangolin
+  - cutadapt
+  - prokka 
+
+module_order:
+  - fastqc:
+      name: "PREPROCESS: FastQC (raw reads)"
+      anchor: "fastqc_raw"
+      info: "This section of the report shows FastQC results for the raw reads before adapter trimming."
+      path_filters:
+        - "*_raw_fastqc.zip"
+
+  - fastqc:
+      name: "POSTPROCESS: FastQC (trimmed reads)"
+      anchor: "fastqc_trimmed"
+      info: "This section of the report shows FastQC results for the adapter trimmed reads."
+      path_filters:
+        - "*_trimmed_fastqc.zip"
+
+  - fastqc:
+      name: "POSTPROCESS: FastQC (host removed reads)"
+      anchor: "fastqc_host_removed"
+      info: "This section of the report shows FastQC results for the adapter trimmed and host removed reads."
+      path_filters:
+        - "*_host_removed_fastqc.zip"
+
+  - bbmap:
+      name: "POSTPROCESS: BBmap (trimmed reads)"
+      anchor: "bbmap_trimmed"
+      info: "This section of the report shows BBmap results for the adapter trimmed reads."
+      path_filters:
+        - "*_bbduk_stats.txt"
+  
+  - bowtie2:
+      name: "MAPPING: Bowtie2 (trimmed reads, host aligned)"
+      anchor: "bowtie2_trimmed"
+      info: "This section of the report shows Bowtie2 results for the adapter trimmed reads."
+      path_filters:
+        - "*_host_alignment.txt"
+      contents: 'reads; of these:'
+      shared: true
+
+  - bowtie2:
+      name: "MAPPING: Bowtie2 (Trimmed reads, EBV aligned)"
+      anchor: "bowtie2_trimmed_ebv"
+      info: "This section of the report shows Bowtie2 results for the adapter trimmed reads."
+      path_filters:
+        - "*_ebv_alignment.txt"
+      contents: 'reads; of these:'
+      shared: true
+
+  - bowtie2:
+      name: "MAPPING: Bowtie2 (Trimmed reads, EBV aligned)"
+      anchor: "bowtie2_host_reads_ebv"
+      info: "This section of the report shows Bowtie2 results for the host specific reads mapped on to the EBV genome"
+      path_filters:
+        - "*_ebv_host_alignment.txt"
+      contents: 'reads; of these:'
+      shared: true
+  
+  - prokka:
+      name: "Prokka: Spades assembly"
+      anchor: "prokka_spades"
+      info: "This section of the report shows Prokka results for the SPades assembly"
+      path_filters:
+        - "*_spades/*"
+      contents: 'contigs:'
+      prokka_barplot: true
+      prokka_table: true
+  
+  - prokka:
+      name: "Prokka: Unicycler assembly"
+      anchor: "prokka_spades"
+      info: "This section of the report shows Prokka results for the SPades assembly"
+      path_filters:
+        - "*_unicycler/*"
+      contents: 'contigs:'
+      prokka_barplot: true
+      prokka_table: true
+  

@@ -1,0 +1,41 @@
+adapters: "adapters.fa"
+fastq_path: "*_L{001,002}_R{1,2}_*.fastq.gz"
+out_path: "result"
+multiqc_config: "viral_genomics/multiqc_config.yaml"
+assembly_type: "de_novo"
+api_key: "sra_api_key"
+public_list: ['SRR9641815', 'SRR9641824', 'SRR9641815', 'SRR9641824', 'SRR9641815', 
+  'SRR9641823', 'SRR9641827', 'SRR9641817', 'SRR9641817', 'SRR9641854', 
+  'SRR10276435', 'SRR7494928', 'SRR10276421', 'SRR7494941', 
+  'SRR7494962']
+public_fastq: "public_ebv_data/"
+references:
+  host:
+    genome: "Human_genomes/GRCh38_iGenomes/Sequence/Bowtie2Index/genome"
+    sans_ebv: "Human_genomes/GRCh38_iGenomes/Sequence/SansEBV"
+    sans_unplaced: "Human_genomes/GRCh38_iGenomes/Sequence/SansUnplaced"
+    sans_unplacedebv: "Human_genomes/GRCh38_iGenomes/Sequence/SansUnplacedEBV"
+  organism:
+    ebv_1_ref: 'ebv_reference/sequence/ebv1ref'
+    ebv_2_ref: 'ebv_reference/sequence/ebv2ref'
+index:
+  host:
+    bowtie:
+      genome: "Human_genomes/GRCh38_iGenomes/Sequence/Bowtie2Index"
+      sans_ebv: "Human_genomes/GRCh38_iGenomes/Sequence/SansEBV"
+      sans_unplaced: "Human_genomes/GRCh38_iGenomes/Sequence/SansUnplaced"
+      sans_unplacedebv: "Human_genomes/GRCh38_iGenomes/Sequence/SansUnplacedEBV"
+  organism:
+    bowtie:
+      ebv_1_ref: "ebv_reference/sequence/ebv1ref"
+      ebv_2_ref: "ebv_reference/sequence/ebv2ref"
+ebv_repeats: "mask/NC_007605_1_repeats.fa"
+ebv_public_data: ""
+variants:
+  hapmap: "hapmap_3.3.hg38.vcf.gz"
+  dbsnp: "Homo_sapiens_assembly38.dbsnp138.vcf"  
+  1000gomni: "1000G_omni2.5.hg38.vcf.gz"  
+  1000gphase3: "1000G.phase3.integrated.sites_only.no_MATCHED_REV.hg38.vcf"  
+  1000gphase1: "1000G_phase1.snps.high_confidence.hg38.vcf.gz"
+  axiom: "Axiom_Exome_Plus.genotypes.all_populations.poly.hg38.vcf.gz"   
+  mills: "Mills_and_1000G_gold_standard.indels.hg38.vcf.gz" 
