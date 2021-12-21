@@ -109,7 +109,7 @@ process cnn_score_variants {
 //
 // TODO: Create a conda environment for SnpEff (ebv_env.yml)
 process annotate_vcfs {
-  conda "/home/sravisha/.conda/envs/ebv_enktl"
+  conda "~/.conda/envs/ebv_enktl"
   errorStrategy 'retry'
   label 'mid_mem'
   publishDir "$params.out_path/variant_calls/${sample}/", mode : "copy"
