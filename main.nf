@@ -20,7 +20,7 @@ include { call_host_variants; generate_gvcf_table; consolidate_gvcfs; genotype_g
 include { prokka ; prokka as prokka_spades ; prokka as prokka_abacas} from './annotation'
 
 workflow ebvAssembly {
-  fastq_path = Channel.fromFilePairs(params.fastq_path, size: 4)
+  fastq_path = Channel.fromFilePairs(params.fastq_path, size: 0Ra2)
   biosino_data = Channel.fromPath(params.biosino_metadata)
   adapter_path = Channel.fromPath(params.adapters)
   out_path = Channel.fromPath(params.out_path)
@@ -33,7 +33,7 @@ workflow ebvAssembly {
     // Download biosino data
     //biosino_download(biosino_data.splitCsv(header: true, sep: '\t'))
     //Run FastQC on raw read
-    fastqQCRaw(fastq_path, "raw")
+    fastqQCRaw(fastq_path, "public")
     //fastqQCPublic(biosino_download.out.fastq_files.groupTuple(), "public")
     // Merge fastq channels
     //fastq_data = fastq_path.join(biosino_download.out.fastq_files, 
@@ -73,7 +73,6 @@ workflow ebvAssembly {
     haplotypeCaller(hostRemoval.out.ebv_dedup_bam, ebv_index)
     cnnScoreVariants(haplotypeCaller.out.vcf_paths, ebv_index)
     annotateVCFs(cnnScoreVariants.out.annotated_vcf_paths)
-
 }
 
 
