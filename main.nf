@@ -33,6 +33,7 @@ workflow ebvAssembly {
     // Download biosino data
     //biosino_download(biosino_data.splitCsv(header: true, sep: '\t'))
     //Run FastQC on raw read
+    //TODO: make this an easier switch to make
     fastqQCRaw(fastq_path, "public")
     //fastqQCPublic(biosino_download.out.fastq_files.groupTuple(), "public")
     // Merge fastq channels
