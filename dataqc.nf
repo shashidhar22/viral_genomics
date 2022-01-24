@@ -31,14 +31,20 @@ process runFastQC {
     rtwo = fastq_paths[1]
     rthree = fastq_paths[2]
     rfour = fastq_paths[3]
+    extension = rone.getExtension()
     if (mode == "raw") 
       """
       zcat ${rone} ${rtwo} ${rthree} ${rfour} > ${sample}_${mode}.fastq
       fastqc -q ${sample}_${mode}.fastq  > stdout.txt 2> stderr.txt
       """
-    else if (mode == "trimmed" | mode == "host_removed" | mode == "public")
+    else if ((mode == "trimmed" | mode == "host_removed" | mode == "public") & extension != "fq.gz")
       """
       cat ${rone} ${rtwo} > ${sample}_${mode}.fastq
+      fastqc -q ${sample}_${mode}.fastq  > stdout.txt 2> stderr.txt
+      """
+    else if ((mode == "trimmed" | mode == "host_removed" | mode == "public") & extension == "fq.gz")
+      """
+      zcat ${rone} ${rtwo} > ${sample}_${mode}.fastq
       fastqc -q ${sample}_${mode}.fastq  > stdout.txt 2> stderr.txt
       """
 }
