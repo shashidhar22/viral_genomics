@@ -16,7 +16,6 @@ run_modules:
   - quast
   - pangolin
   - cutadapt
-  - prokka 
 
 module_order:
   - fastqc:

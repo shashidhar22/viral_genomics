@@ -53,9 +53,10 @@ process indexBowtie{
 // TODO: 
 process hostRemoval {
   container "$params.bowtie2"
-  label 'high_mem'
+  label 'mid_mem'
   errorStrategy 'retry'
-  publishDir "$params.out_path/host/alignment/", mode : "copy", pattern : "*.ba*"
+  time { 1.day * task.attempt }
+  //publishDir "$params.out_path/host/alignment/", mode : "copy", pattern : "*.ba*"
   publishDir "$params.out_path/organism/unaligned_reads/", mode: "copy", pattern : "*filtered.fq.gz"
   publishDir "$params.out_path/organism/deduplicated_reads/", mode: "copy", pattern : "*deduped.fq.gz"
   publishDir "$params.out_path/alignment_reports/", mode: "copy", pattern : "*txt"
@@ -68,7 +69,7 @@ process hostRemoval {
     path "${sample}_host_sorted.ba*", emit: host_bam
     path "${sample}_host_alignment.txt", emit: host_alignment_stats
     path "${sample}_ebv_alignment.txt", emit: ebv_alignment_stats
-    path "${sample}_ebv_host_alignment.txt", emit: ebv_host_alignment_stats
+    //path "${sample}_ebv_host_alignment.txt", emit: ebv_host_alignment_stats
     path "${sample}_ebv_dedup.ba*" , emit: ebv_dedup_bam
   script:
     r1 = fastq_path[0]
@@ -76,22 +77,22 @@ process hostRemoval {
     """
     bowtie2 --very-sensitive-local -x ${bowtie_index}/genome -1 ${r1} -2 ${r2} \
       -S ${sample}.sam > stdout.log 2> ${sample}_host_alignment.txt  
-    samtools view -S -b -f 12 -F 256 ${sample}.sam > ${sample}_unmapped.bam
-    samtools view -S -b -F 1280 ${sample}.sam > ${sample}_host_mapped.bam
+    samtools view -S -b -f 12 -F 256 ${sample}.sam >> ${sample}_unmapped.bam
+    samtools view -S -b -F 1280 ${sample}.sam >> ${sample}_host_mapped.bam
     samtools sort ${sample}_unmapped.bam -o ${sample}_unmapped_sorted.bam
     samtools sort ${sample}_host_mapped.bam -o ${sample}_host_sorted.bam
     samtools index ${sample}_unmapped_sorted.bam ${sample}_unmapped_sorted.bai
     samtools index ${sample}_host_sorted.bam ${sample}_host_sorted.bai
     samtools fastq -G 1024 ${sample}_unmapped_sorted.bam \
       --threads ${task.cpus} \
-      -1 ${sample}_R1_filtered.fq -2 ${sample}_R2_filtered.fq > stdout.log 2> stderr.log
+      -1 ${sample}_R1_filtered.fq -2 ${sample}_R2_filtered.fq >> stdout.log 2> stderr.log
     samtools fastq -f 3 ${sample}_host_sorted.bam \
       --threads ${task.cpus} \
-      -1 ${sample}_R1_host.fq -2 ${sample}_R2_host.fq > stdout.log 2> stderr.log
+      -1 ${sample}_R1_host.fq -2 ${sample}_R2_host.fq >> stdout.log 2>> stderr.log
     bowtie2 --very-sensitive-local -x ${org_index}/genome \
       -1 ${sample}_R1_filtered.fq -2 ${sample}_R2_filtered.fq \
-      -S ${sample}_ebv_mapped.sam > stdout.log 2> ${sample}_ebv_alignment.txt
-    samtools view -S -b ${sample}_ebv_mapped.sam > ${sample}_ebv_mapped.bam
+      -S ${sample}_ebv_mapped.sam >> stdout.log 2>> ${sample}_ebv_alignment.txt
+    samtools view -S -b ${sample}_ebv_mapped.sam >> ${sample}_ebv_mapped.bam
     samtools fixmate -m ${sample}_ebv_mapped.bam ${sample}_ebv_mapped_fixmate.bam
     samtools sort -o ${sample}_ebv_sorted.bam ${sample}_ebv_mapped_fixmate.bam
     samtools markdup -r ${sample}_ebv_sorted.bam ${sample}_ebv_dedup.bam
@@ -99,10 +100,10 @@ process hostRemoval {
     samtools fastq -f 3 ${sample}_ebv_dedup.bam \
       --threads ${task.cpus} \
       -1 ${sample}_R1_deduped_unrep.fq -2 ${sample}_R2_deduped_unrep.fq \
-      > stdout.log 2> stderr.log
-    bowtie2 --very-sensitive-local -x ${org_index}/genome \
-      -1 ${sample}_R1_host.fq -2 ${sample}_R2_host.fq \
-      -S ${sample}_ebv_host_reads.sam > stdout.log 2> ${sample}_ebv_host_alignment.txt
+      >> stdout.log 2>> stderr.log
+    ##bowtie2 --very-sensitive-local -x ${org_index}/genome \
+    ##  -1 ${sample}_R1_host.fq -2 ${sample}_R2_host.fq \
+    ##  -S ${sample}_ebv_host_reads.sam >> stdout.log 2>> ${sample}_ebv_host_alignment.txt
     
     """
 }
@@ -125,6 +126,7 @@ process bowtie_Align {
   container "$params.bowtie2"
   label 'high_mem'
   errorStrategy 'retry'
+  time '1d 6h'
   publishDir "$params.out_path/host/alignment/", mode : "copy", pattern : "*.ba*"
   publishDir "$params.out_path/organism/unaligned_reads/", mode: "copy", pattern : "*.fq.gz"
   input:
@@ -170,6 +172,7 @@ process bowtie_Align {
 process align_ebv {
   container "$params.samtools_bowtie"
   errorStrategy 'retry'
+  time '1d 6h'
   label 'high_mem'
   publishDir "$params.out_path/alignment/ebv/bam", mode : "copy"
   input:
@@ -209,6 +212,7 @@ process align_ebv {
 process align_filtered_ebv {
   container "$params.samtools_bowtie"
   errorStrategy 'retry'
+  time '1d 6h'
   label 'high_mem'
   publishDir "$params.out_path/alignment/ebv/bam_filtered", mode : "copy"
   input:
@@ -238,4 +242,3 @@ workflow {
     bowtie_Align(fastq_path)
 
 }
-

@@ -20,18 +20,13 @@ process bwa_index {
         file "reference.tar.gz"
 
 """#!/bin/bash
-
 set -e
-
 # Build the BWA index
 bwa index ${fasta}
-
 # Make the tarball
 tar cvf reference.tar "${fasta}*"
-
 # Compress it
 gzip reference.tar
-
 """
 }
 
@@ -47,20 +42,16 @@ process bwa_filter {
 
 
 """#!/bin/bash
-
 # Stop execution if any of the individual commands have a non-zero exit status
 set -e
-
 # Get the name of the indexed genome
 bwa_index_fn=\$(tar -ztvf ${index_tgz} | head -1 | sed \'s/.* //\')
 bwa_index_prefix=\${bwa_index_fn%.*}
 echo BWA index prefix is \${bwa_index_prefix}
-
 # Extract the tarball containing the indexed genome
 echo Extracting BWA index
 mkdir -p bwa_index/ 
 tar -I pigz -xf ${index_tgz} -C bwa_index/
-
 echo Files in index directory: 
 ls -l -h bwa_index 
 echo Running BWA 
@@ -69,11 +60,9 @@ bwa mem -t ${task.cpus} \
 	-o alignment.sam \
 	bwa_index/\$bwa_index_prefix \
 	${R1} ${R2}
-
 # The line below will raise an error if the file is empty
 echo Checking if alignment is empty
 [[ -s alignment.sam ]]
-
 # In the comand below, the "-F 12" flag will instruct samtools to filter
 # out any pairs in which both reads are unmapped. This will retain any
 # pairs in which either read is mapped.
@@ -83,7 +72,6 @@ echo Extracting Unaligned Pairs
 samtools fastq alignment.sam \
 	--threads ${task.cpus} -F 12 \
 	-1 ${R1}.filtered.fq.gz -2 ${R2}.filtered.fq.gz
-
 echo Done
 """
 }

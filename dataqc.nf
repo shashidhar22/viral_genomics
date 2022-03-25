@@ -37,12 +37,12 @@ process runFastQC {
       zcat ${rone} ${rtwo} ${rthree} ${rfour} > ${sample}_${mode}.fastq
       fastqc -q ${sample}_${mode}.fastq  > stdout.txt 2> stderr.txt
       """
-    else if ((mode == "trimmed" | mode == "host_removed" | mode == "public") & extension != "fq.gz")
+    else if ((mode == "trimmed" | mode == "host_removed" | mode == "public") & (extension != "gz"))
       """
       cat ${rone} ${rtwo} > ${sample}_${mode}.fastq
       fastqc -q ${sample}_${mode}.fastq  > stdout.txt 2> stderr.txt
       """
-    else if ((mode == "trimmed" | mode == "host_removed" | mode == "public") & extension == "fq.gz")
+    else if ((mode == "trimmed" | mode == "host_removed" | mode == "public") & (extension == "gz"))
       """
       zcat ${rone} ${rtwo} > ${sample}_${mode}.fastq
       fastqc -q ${sample}_${mode}.fastq  > stdout.txt 2> stderr.txt
@@ -74,7 +74,7 @@ process runMultiQC {
     path host_bowtie_stats
     path ebv_bowtie_stats
     path ebv_fastqc_out
-    path prokka_spades
+    path prokka_spadeess
     path prokka_unicycler 
     path config
   output:
@@ -176,7 +176,6 @@ process repairFastq {
 /*workflow {
   fastq_paths = Channel.fromFilePairs(params.fastq_paths, size: 4)
   out_path = Channel.from(params.out_path)
-
   main:
     runFastqc(fastq_paths)
     runMultiQC(runFastqc.out.raw_fastqc_out.collect{"$it"})

@@ -5,6 +5,7 @@ process spades {
   //module "SPAdes"
   label 'high_mem'
   errorStrategy 'retry'
+  time '1d 6h'
   publishDir "$params.out_path/genome_assembly/$params.assembly_type/${sample}", 
     mode : "copy", pattern : "${sample}/*fa*"
   publishDir "$params.out_path/contigs/$params.assembly_type/", mode : "copy", 
@@ -37,6 +38,7 @@ process spades {
 process unicycler {
   container "$params.unicycler"
   errorStrategy 'retry'
+  time { 1.day * task.attempt }
   label 'high_mem'
   publishDir "$params.out_path/genome_assembly/unicycler/${sample}", 
     mode : "copy", pattern : "${sample}/assembly.*"
@@ -62,6 +64,7 @@ process unicycler {
 process abacas {
   container "$params.abacas"
   label 'high_mem'
+  time '1d 6h'
   errorStrategy 'retry'
   publishDir "$params.out_path/contigs/abacas/${mode}", mode : "copy", pattern : "${sample}_abacas.fasta"
   input:
@@ -81,6 +84,7 @@ process abacas {
 process repeat_masker {
   container "$params.repeatmasker"
   label 'high_mem'
+  time '1d 6h'
   errorStrategy 'retry'
   publishDir "$params.out_path/repeatmasker", mode : "copy", pattern : "${sample}.fasta*"
   publishDir "$params.out_path/contigs/repeat_masked", mode : "copy", pattern : "${sample}.fasta.masked", saveAs: { "${sample}_masked.fasta"}

@@ -20,6 +20,7 @@ process bam_sort {
   container "$params.samtools"
   errorStrategy 'retry'
   label 'high_mem'
+  time '1d 6h'
   publishDir "$params.out_path/alignment/sorted/", mode : "copy", pattern: "*_sorted.ba*"
   input:
     tuple val(sample), path(bam_file)
@@ -38,6 +39,7 @@ process idxstats {
   container "$params.samtools"
   errorStrategy 'retry'
   label 'low_mem'
+  time '1d 6h'
   publishDir "$params.out_path/idxstats/", mode : "copy"
   input:
     tuple val(sample), path(bam_file), path(index_file)
@@ -53,6 +55,7 @@ process coverage {
   container "$params.samtools"
   errorStrategy 'retry'
   label 'mid_mem'
+  time '1d 6h'
   publishDir "$params.out_path/coverage/${organism}", mode : "copy"
   input:
     tuple val(sample), path(sam_file), val(organism)
@@ -70,6 +73,7 @@ process coverage {
 process keep_unaligned {
   container "$params.samtools"
   errorStrategy 'retry'
+  time '1d 6h'
   label 'mid_mem'
   publishDir "$params.out_path/unaligned/", mode : "copy"
   input:
@@ -87,6 +91,7 @@ process keep_unaligned {
 process mpileup {
   container "$params.samtools"
   errorStrategy 'retry'
+  time '1d 6h'
   label 'high_mem'
   publishDir "$params.out_path/mpileup/", mode : "copy"
   input:

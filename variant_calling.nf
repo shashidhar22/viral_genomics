@@ -109,9 +109,10 @@ process cnn_score_variants {
 //
 // TODO: Create a conda environment for SnpEff (ebv_env.yml)
 process annotate_vcfs {
-  conda "~/.conda/envs/ebv_enktl"
+  conda '/home/ebrierch/.conda/envs/ebv_enktl'
   errorStrategy 'retry'
-  label 'mid_mem'
+  time '1d 6h'
+  label 'local'
   publishDir "$params.out_path/variant_calls/${sample}/", mode : "copy"
   input:  
     each path(vcf_path) 
@@ -147,6 +148,7 @@ process annotate_vcfs {
 process call_host_variants {
   container "$params.gatk"
   errorStrategy 'retry'
+  time '1d 6h'
   label 'mid_mem'
   publishDir "$params.out_path/host_variant_calls/", mode : "copy"
   input:
@@ -188,6 +190,7 @@ process call_host_variants {
 process generate_gvcf_table {
   module "R/4.1.0-foss-2020b"
   errorStrategy 'retry'
+  time '1d 6h'
   label 'mid_mem'
 
   publishDir "$params.out_path/variant_calls/", mode : "copy"
@@ -222,6 +225,7 @@ process generate_gvcf_table {
 process consolidate_gvcfs {
   conda "/home/sravisha/.conda/envs/ebv_enktl"
   errorStrategy 'retry'
+  time '1d 6h'
   label 'mid_mem'
 
   publishDir "$params.out_path/host_variant_calls/", mode : "copy"
@@ -243,6 +247,7 @@ process consolidate_gvcfs {
 process genotype_gvcfs {
   container "$params.gatk"
   errorStrategy 'retry'
+  time '1d 6h'
   label 'mid_mem'
   publishDir "$params.out_path/host_variant_calls/", mode : "copy"
   input:
@@ -265,6 +270,7 @@ process genotype_gvcfs {
 process variant_scoring {
   container "$params.gatk"
   errorStrategy 'retry'
+  time '1d 6h'
   label 'mid_mem'
   publishDir "$params.out_path/host_variant_calls/", mode : "copy"  
   input:
@@ -302,3 +308,4 @@ process variant_scoring {
       -mode BOTH
     """
 }
+
