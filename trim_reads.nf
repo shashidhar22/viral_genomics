@@ -19,7 +19,7 @@ process bbduk {
   errorStrategy 'retry'
   container "$params.bbmap"
   label 'high_mem'
-  publishDir "$params.out_path/trimmed_reads/", mode : "copy"
+  //publishDir "$params.out_path/trimmed_reads/", mode : "copy"
   input:
     tuple val(sample), path(fastq_path)
   output:
