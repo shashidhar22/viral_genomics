@@ -20,33 +20,24 @@ process runFastQC {
   container "$params.fastqc"
   errorStrategy 'retry'
   label 'low_mem'
-  publishDir "$params.out_path/fastqc/${mode}", mode : "copy"
+  time  '1d'
+  publishDir "$params.out_path/fastqc/${mode}/results", mode : "copy", pattern : "*.zip"
+  publishDir "$params.out_path/fastqc/${mode}/report", mode : "copy", pattern : "*.html"
   input:
     tuple val(sample), path(fastq_paths)
     val mode
   output:
-    path "${sample}_${mode}_fastqc.zip", emit: fastqc_results
+    path "*.zip", emit: fastqc_results
+    path "*.html", emit: fastqc_reports
   script:
     rone = fastq_paths[0]
     rtwo = fastq_paths[1]
     rthree = fastq_paths[2]
     rfour = fastq_paths[3]
     extension = rone.getExtension()
-    if (mode == "raw") 
-      """
-      zcat ${rone} ${rtwo} ${rthree} ${rfour} > ${sample}_${mode}.fastq
-      fastqc -q ${sample}_${mode}.fastq  > stdout.txt 2> stderr.txt
-      """
-    else if ((mode == "trimmed" | mode == "host_removed" | mode == "public") & (extension != "gz"))
-      """
-      cat ${rone} ${rtwo} > ${sample}_${mode}.fastq
-      fastqc -q ${sample}_${mode}.fastq  > stdout.txt 2> stderr.txt
-      """
-    else if ((mode == "trimmed" | mode == "host_removed" | mode == "public") & (extension == "gz"))
-      """
-      zcat ${rone} ${rtwo} > ${sample}_${mode}.fastq
-      fastqc -q ${sample}_${mode}.fastq  > stdout.txt 2> stderr.txt
-      """
+    """
+    fastqc -t 200 --noextract -q  -o ./ *.f*q*  > stdout.txt 2> stderr.txt
+    """
 }
 
 // Run MULTIQC
@@ -161,15 +152,16 @@ process repairFastq {
   container "$params.bbmap"
   errorStrategy 'retry'
   label 'low_mem'
-  publishDir "$params.out_path/ebv_reads", mode : "copy"
+  publishDir "$params.out_path/organism/fastq", mode : "copy"
   input:
-    tuple val(sample), path(ebv_dedup_reads)
+    each path(ebv_dedup_reads)
   output:
-    tuple val(sample), path("*.fastq") , emit: repaired_fastq
+    path "*_reorg.fq" , emit: repaired_fastq
   script:
+    sample = ebv_dedup_reads[0].getSimpleName().replaceAll(/_R1_org/, "")
     """
-    repair.sh in=${sample}_R1_deduped_unrep.fq in2=${sample}_R2_deduped_unrep.fq \
-    out=${sample}_R1_deduped.fastq out2=${sample}_R2_deduped.fastq
+    repair.sh in=${sample}_R1_org.fq in2=${sample}_R2_org.fq \
+    out=${sample}_R1_reorg.fq out2=${sample}_R2_reorg.fq
     """
 }
 
