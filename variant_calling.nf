@@ -109,7 +109,7 @@ process cnn_score_variants {
 //
 // TODO: Create a conda environment for SnpEff (ebv_env.yml)
 process annotate_vcfs {
-  conda '/home/ebrierch/.conda/envs/ebv_enktl'
+  conda '/path_to/home_dir/.conda/envs/ebv_enktl'
   errorStrategy 'retry'
   time '1d 6h'
   label 'local'
