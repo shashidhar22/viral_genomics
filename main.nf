@@ -12,9 +12,10 @@ include { annotate_vcfs as annotateVCFs} from './variant_calling'
 include { biosino_download } from './data_download'
 include { runFastQC; runMultiQC; quast; quast as quast_masker; quast as quast_uniclyer; quast as quast_abacas ; getFastq ; generateFastq} from './dataqc'
 //include { bowtie_Align; align_ebv; align_filtered_ebv ; align_filtered_ebv as align_sampled_ebv} from './bowtie'
-include { sam_to_bam;bam_sort;coverage;keep_unaligned;mpileup } from './samview'
+include { bam_sort;coverage;keep_unaligned;mpileup } from './samtools'
 include { spades; unicycler; abacas; repeat_masker } from './spades'
-include { coverage as ebv_coverage } from './samview'
+include { coverage as ebv_coverage } from './samtools'
+include { splitSam ; extractHostReads ; extractOrgReads } from './samtools'
 include { haplotype_caller; cnn_score_variants ; annotate_vcfs} from './variant_calling'
 include { call_host_variants; generate_gvcf_table; consolidate_gvcfs; genotype_gvcfs ; variant_scoring } from './variant_calling'
 include { prokka ; prokka as prokka_spades ; prokka as prokka_abacas} from './annotation'
@@ -31,8 +32,6 @@ workflow ebvAssembly {
   main:
     // Download biosino data
     //biosino_download(biosino_data.splitCsv(header: true, sep: '\t'))
-    //Run FastQC on raw read
-    fastqQCRaw(fastq_path, "public")
     //fastqQCPublic(biosino_download.out.fastq_files.groupTuple(), "public")
     // Merge fastq channels
     //fastq_data = fastq_path.join(biosino_download.out.fastq_files, 
@@ -40,14 +39,19 @@ workflow ebvAssembly {
     // Trim adapters and low quality reads
     bbduk(fastq_path)
     // FastQC on trimmed reads
-    fastqQCTrim(bbduk.out.trimmed_reads, "trimmed")
     // Align sequences to host genome, extract unalgined reads, align these
     // to the EBV genome, remove PCR duplicates, and extract the EBV reads
-    hostRemoval(bbduk.out.trimmed_reads.combine(human_index).combine(ebv_index))
+    hostRemoval(bbduk.out.trimmed_reads, human_index, ebv_index)
+    // Split SAM file to get Host and Organism BAM files
+    splitSam(hostRemoval.out.sam_path)
+    // Extract Host reads
+    extractHostReads(splitSam.out.host_bam_path)
+    // Extract Organism reads
+    extractOrgReads(splitSam.out.org_bam_path, ebv_index)
     // FastQC on EBV specific reads
-    fastQCEbv(hostRemoval.out.deduped_reads, "host_removed")
+    fastQCEbv(extractOrgReads.out.org_fastqc_input, "host_removed")
     // Repair the deduplicated EBV reads to appear as ordered pairs
-    repairFastq(hostRemoval.out.deduped_reads)
+    repairFastq(extractOrgReads.out.org_fastq_files)
     // Run spades on the EBV reads
     spades(repairFastq.out.repaired_fastq)
     // Run unicycler on the EBV reads
@@ -57,21 +61,26 @@ workflow ebvAssembly {
     prokkaSpades(abacasSpades.out.abacas_contigs, "spades")
     prokkaUnicycler(abacasUnicycler.out.abacas_contigs, "unicycler")
     // Generate a multiQC report
-    runMultiQC(fastqQCRaw.out.fastqc_results.toSortedList(), 
-      fastqQCTrim.out.fastqc_results.toSortedList(), 
-      bbduk.out.trimmed_stats.toSortedList(), 
-      hostRemoval.out.host_alignment_stats.toSortedList(),
-      hostRemoval.out.ebv_alignment_stats.toSortedList(),
-      fastQCEbv.out.fastqc_results.toSortedList(),
-      prokkaSpades.out.gene_annotation.toSortedList(),
-      prokkaUnicycler.out.gene_annotation.toSortedList(),
-      multi_config)
+    //runMultiQC(fastqQCRaw.out.fastqc_results.toSortedList(), 
+    //  fastqQCTrim.out.fastqc_results.toSortedList(), 
+    //  bbduk.out.trimmed_stats.toSortedList(), 
+    //  hostRemoval.out.host_alignment_stats.toSortedList(),
+    //  hostRemoval.out.ebv_alignment_stats.toSortedList(),
+    //  fastQCEbv.out.fastqc_results.toSortedList(),
+    //  prokkaSpades.out.gene_annotation.toSortedList(),
+    // prokkaUnicycler.out.gene_annotation.toSortedList(),
+    //  multi_config)
     // Run quast on the EBV assembly
     quastSpades(abacasSpades.out.abacas_contigs.toSortedList(), ebv_index, "spades")
     quastUnicycler(abacasUnicycler.out.abacas_contigs.toSortedList(), ebv_index, "unicycler")
-    haplotypeCaller(hostRemoval.out.ebv_dedup_bam, ebv_index)
+    haplotypeCaller(extractOrgReads.out.org_bam_path, ebv_index)
     cnnScoreVariants(haplotypeCaller.out.vcf_paths, ebv_index)
     annotateVCFs(cnnScoreVariants.out.annotated_vcf_paths)
+    //Run FastQC on raw read
+    fastqQCRaw(fastq_path, "public")
+    // FastQC on trimmed reads
+    fastqQCTrim(bbduk.out.trimmed_qc, "trimmed")
+
 
 }
 
