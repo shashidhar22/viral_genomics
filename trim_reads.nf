@@ -23,7 +23,8 @@ process bbduk {
   input:
     tuple val(sample), path(fastq_path)
   output:
-    tuple val(sample), path("*clean.fq"), emit: trimmed_reads
+    path "*clean.fq", emit: trimmed_reads
+    tuple val(sample), path("*clean.fq"), emit: trimmed_qc
     path "${sample}_bbduk_stats.txt", emit: trimmed_stats
   script:
   if ( fastq_path.size() == 2 )
