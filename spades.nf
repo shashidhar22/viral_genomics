@@ -11,15 +11,16 @@ process spades {
   publishDir "$params.out_path/contigs/$params.assembly_type/", mode : "copy", 
     pattern : "${sample}.fasta"
   input:
-    tuple val(sample), path(trimmed_reads)
+    each path(trimmed_reads)
   output:
     tuple val(sample), path("${sample}/contigs.fasta"), 
       path("${sample}/scaffolds.fasta"), path("${sample}/assembly_graph.fastg"),
       path("${sample}/assembly_graph_with_scaffolds.gfa"), emit: genome_assembly
     path "${sample}.fasta", emit: contigs
   script:
-    def forward = trimmed_reads[0]
-    def reverse = trimmed_reads[1]
+    sample = trimmed_reads[0].getSimpleName().replaceAll(/_R1_reorg/, "")
+    forward = trimmed_reads[0]
+    reverse = trimmed_reads[1]
     def memory = "$task.memory" =~ /\d+/
     if ("$params.assembly_type" == "reference_guided")
       """
@@ -45,14 +46,15 @@ process unicycler {
   publishDir "$params.out_path/contigs/unicycler/", mode : "copy", 
     pattern : "${sample}.fasta"
   input:
-    tuple val(sample), path(trimmed_reads)
+    each path(trimmed_reads)
   output:
     tuple val(sample), path("${sample}/assembly.fasta"), 
     path("${sample}/assembly.gfa"), emit: unicycler
     path "${sample}.fasta", emit: contigs
   script:
-    def forward = trimmed_reads[0]
-    def reverse = trimmed_reads[1]
+    sample = trimmed_reads[0].getSimpleName().replaceAll(/_R1_reorg/, "")
+    forward = trimmed_reads[0]
+    reverse = trimmed_reads[1]
     def memory = "$task.memory" =~ /\d+/
     """
     unicycler -1 ${forward} -2 ${reverse} --mode bold --verbosity 0 -o ${sample} > stdout.log 2> stderr.log
