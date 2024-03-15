@@ -4,22 +4,23 @@ process spades {
   container "$params.spades"
   //module "SPAdes"
   label 'high_mem'
-  errorStrategy 'retry'
+  errorStrategy { task.exitStatus in 21 ? 'ignore' : 'retry'}
   time '1d 6h'
   publishDir "$params.out_path/genome_assembly/$params.assembly_type/${sample}", 
     mode : "copy", pattern : "${sample}/*fa*"
   publishDir "$params.out_path/contigs/$params.assembly_type/", mode : "copy", 
     pattern : "${sample}.fasta"
   input:
-    tuple val(sample), path(trimmed_reads)
+    each path(trimmed_reads)
   output:
     tuple val(sample), path("${sample}/contigs.fasta"), 
       path("${sample}/scaffolds.fasta"), path("${sample}/assembly_graph.fastg"),
       path("${sample}/assembly_graph_with_scaffolds.gfa"), emit: genome_assembly
     path "${sample}.fasta", emit: contigs
   script:
-    def forward = trimmed_reads[0]
-    def reverse = trimmed_reads[1]
+    sample = trimmed_reads[0].getSimpleName().replaceAll(/_R1_reorg/, "")
+    forward = trimmed_reads[0]
+    reverse = trimmed_reads[1]
     def memory = "$task.memory" =~ /\d+/
     if ("$params.assembly_type" == "reference_guided")
       """
@@ -45,14 +46,15 @@ process unicycler {
   publishDir "$params.out_path/contigs/unicycler/", mode : "copy", 
     pattern : "${sample}.fasta"
   input:
-    tuple val(sample), path(trimmed_reads)
+    each path(trimmed_reads)
   output:
     tuple val(sample), path("${sample}/assembly.fasta"), 
     path("${sample}/assembly.gfa"), emit: unicycler
     path "${sample}.fasta", emit: contigs
   script:
-    def forward = trimmed_reads[0]
-    def reverse = trimmed_reads[1]
+    sample = trimmed_reads[0].getSimpleName().replaceAll(/_R1_reorg/, "")
+    forward = trimmed_reads[0]
+    reverse = trimmed_reads[1]
     def memory = "$task.memory" =~ /\d+/
     """
     unicycler -1 ${forward} -2 ${reverse} --mode bold --verbosity 0 -o ${sample} > stdout.log 2> stderr.log
@@ -89,7 +91,7 @@ process repeat_masker {
   publishDir "$params.out_path/repeatmasker", mode : "copy", pattern : "${sample}.fasta*"
   publishDir "$params.out_path/contigs/repeat_masked", mode : "copy", pattern : "${sample}.fasta.masked", saveAs: { "${sample}_masked.fasta"}
   input:
-    each abacas_path
+    each path(abacas_path)
     path repeat_table 
   output:
     path "${sample}.fasta.masked", emit: masked_fasta
@@ -101,7 +103,15 @@ process repeat_masker {
     sample = abacas_path.getBaseName()
     """
     RepeatMasker -pa 4 -lib ${repeat_table} -s -e rmblast -dir ./ ${abacas_path} > stdout.log 2> stderr.log
-    cp ${sample}.fasta.masked ${sample}_masked.fasta
+    if [ -s ${sample}.fasta.masked ]; then
+      cp ${sample}.fasta.masked ${sample}_masked.fasta
+    else
+      cp ${sample}.fasta ${sample}_masked.fasta
+      cp ${sample}.fasta ${sample}.fasta.masked
+      touch ${sample}.fasta.cat
+      touch ${sample}.fasta.out
+      touch ${sample}.fasta.tbl
+    fi
     """
 }
 
