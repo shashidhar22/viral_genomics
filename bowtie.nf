@@ -50,7 +50,7 @@ process hostRemoval {
   container "$params.bowtie2"
   label 'mid_mem'
   errorStrategy 'retry'
-  time { 1.day * task.attempt }
+  time '3d'
   publishDir "$params.out_path/alignment_reports/", mode: "copy", pattern : "*.txt"
 
   input:
@@ -64,7 +64,7 @@ process hostRemoval {
     def r2 = fastq_path[1]
     def sample = r1.getSimpleName().replaceAll(/_R1/, "")
     """
-    bowtie2 -p 60 --very-sensitive-local -x ${bowtie_index}/genome -1 ${r1} -2 ${r2} \
+    bowtie2 -p 60 --very-fast-local -x ${bowtie_index}/genome -1 ${r1} -2 ${r2} \
       -S ${sample}.sam > stdout.log 2> ${sample}_host_alignment.txt  
     """
 }
@@ -133,24 +133,25 @@ process bowtie_Align {
 process align_ebv {
   container "$params.samtools_bowtie"
   errorStrategy 'retry'
-  time '1d 6h'
+  time '3d'
   label 'high_mem'
   publishDir "$params.out_path/alignment/ebv/bam", mode : "copy"
   input:
-    tuple val(sample), path(fastq_path), path(bowtie_index)
+    each fastq_path
+    path bowtie_index
 
   output:
-    tuple val(sample), path("${sample}_sorted.bam"), 
-      path("${sample}_sorted.bai"), emit: sam_path
+    path "*sorted.ba*", emit: bam_path
   script:
-    r1 = fastq_path[0]
-    r2 = fastq_path[1]
+    def r1 = fastq_path[0]
+    def r2 = fastq_path[1]
+    def sample = r1.getSimpleName()
     """
-    bowtie2 --very-sensitive-local -x ${bowtie_index}/genome -1 ${r1} -2 ${r2} \
+    bowtie2 -p 60 --very-sensitive-local -x ${bowtie_index}/genome -1 ${r1} -2 ${r2} \
       -S ${sample}.sam > stdout.log 2> stderr.log  
-    samtools view -S -b ${sample}.sam > ${sample}.bam
-    samtools sort ${sample}.bam -o ${sample}_sorted.bam
-    samtools index ${sample}_sorted.bam ${sample}_sorted.bai
+    samtools view -@ 20 -f 3 -S -b ${sample}.sam > ${sample}.bam
+    samtools sort -@ 20 ${sample}.bam -o ${sample}_sorted.bam
+    samtools index -@ 20 ${sample}_sorted.bam ${sample}_sorted.bai
     """
 }
 
