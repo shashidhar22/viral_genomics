@@ -106,10 +106,11 @@ process quast {
     val mode
   output:
     path "${mode}", emit: quast
+    path "${mode}/transposed_report.tsv", emit: report
   script:
     memory = "$task.memory" =~ /\d+/
     """
-    quast.py -r ${reference_genome}/genome.fa --circos --glimmer -o ${mode} *.fasta > stdout.log 2> stderr.log
+    quast.py -r ${reference_genome}/genome.fa --glimmer -o ${mode} *.fasta* > stdout.log 2> stderr.log
     """
     
 }
@@ -118,7 +119,6 @@ process getFastq {
   module "SRA-Toolkit"
   errorStrategy 'retry'
   label 'low_mem'
-  publishDir "$params.public_fastq", mode : "copy"
   input:
     each sra_number
   output:
