@@ -4,7 +4,7 @@ process spades {
   container "$params.spades"
   //module "SPAdes"
   label 'high_mem'
-  errorStrategy 'retry'
+  errorStrategy { task.exitStatus in 21 ? 'ignore' : 'retry'}
   time '1d 6h'
   publishDir "$params.out_path/genome_assembly/$params.assembly_type/${sample}", 
     mode : "copy", pattern : "${sample}/*fa*"
@@ -91,7 +91,7 @@ process repeat_masker {
   publishDir "$params.out_path/repeatmasker", mode : "copy", pattern : "${sample}.fasta*"
   publishDir "$params.out_path/contigs/repeat_masked", mode : "copy", pattern : "${sample}.fasta.masked", saveAs: { "${sample}_masked.fasta"}
   input:
-    each abacas_path
+    each path(abacas_path)
     path repeat_table 
   output:
     path "${sample}.fasta.masked", emit: masked_fasta
@@ -103,7 +103,15 @@ process repeat_masker {
     sample = abacas_path.getBaseName()
     """
     RepeatMasker -pa 4 -lib ${repeat_table} -s -e rmblast -dir ./ ${abacas_path} > stdout.log 2> stderr.log
-    cp ${sample}.fasta.masked ${sample}_masked.fasta
+    if [ -s ${sample}.fasta.masked ]; then
+      cp ${sample}.fasta.masked ${sample}_masked.fasta
+    else
+      cp ${sample}.fasta ${sample}_masked.fasta
+      cp ${sample}.fasta ${sample}.fasta.masked
+      touch ${sample}.fasta.cat
+      touch ${sample}.fasta.out
+      touch ${sample}.fasta.tbl
+    fi
     """
 }
 
