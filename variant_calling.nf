@@ -49,6 +49,35 @@ process haplotype_caller {
     """
 }
 
+
+process haplotype_caller_wgs {
+  container "$params.gatk"
+  errorStrategy 'retry'
+  label 'mid_mem'
+  publishDir "$params.out_path/variant_calls/${sample}/", mode : "copy"
+  input:
+    tuple val(sample), path(bam_path), path(reference)
+  output:
+    path "${sample}.vcf.gz*" , emit: vcf_paths
+  script:
+    def bam_file = bam_path[1]
+    """
+    gatk AddOrReplaceReadGroups \
+      -I ${bam_file} \
+      -O ${sample}_rg.bam \
+      -LB ebv \
+      -PL ILLUMINA \
+      -PU NA \
+      -SM ${sample} \
+      --CREATE_INDEX  true
+    gatk --java-options "-Xmx4g" HaplotypeCaller \
+      -R ${reference}/genome.fa \
+      -I ${sample}_rg.bam \
+      -ploidy 1 \
+      --output ${sample}.vcf.gz  > stdout.log 2> stderr.log 
+    """
+}
+
 // Score variants using a convolution neural network model trained on the 
 // variant calling data from the previous step and the reference context, 
 // providing a score for each variant. Here we use the CNNScoreVariants toolkit
@@ -109,10 +138,11 @@ process cnn_score_variants {
 //
 // TODO: Create a conda environment for SnpEff (ebv_env.yml)
 process annotate_vcfs {
-  conda '/path_to/home_dir/.conda/envs/ebv_enktl'
+  conda "$params.conda.enktl"
   errorStrategy 'retry'
   time '1d 6h'
   label 'local'
+  cache true
   publishDir "$params.out_path/variant_calls/${sample}/", mode : "copy"
   input:  
     each path(vcf_path) 
@@ -188,7 +218,7 @@ process call_host_variants {
 //
 // TODO: 
 process generate_gvcf_table {
-  module "R/4.1.0-foss-2020b"
+  conda "$params.conda.enktl"
   errorStrategy 'retry'
   time '1d 6h'
   label 'mid_mem'
@@ -223,7 +253,7 @@ process generate_gvcf_table {
 //
 // TODO: 
 process consolidate_gvcfs {
-  conda "/home/sravisha/.conda/envs/ebv_enktl"
+  conda "$params.conda.enktl"
   errorStrategy 'retry'
   time '1d 6h'
   label 'mid_mem'
@@ -309,3 +339,109 @@ process variant_scoring {
     """
 }
 
+
+
+process create_alternate_reference {
+  container "$params.gatk"
+  errorStrategy 'retry'
+  time '1h'
+  label 'mid_mem'
+  publishDir "$params.out_path/alternate_reference/", mode : "copy"  
+  input:
+    each sample 
+    path vcf_data
+    path tabix_data
+    path ref_path
+    path ref_index
+    path ref_dict
+
+  output:
+    path "${sample}_consensus.fasta", emit: alt_ref
+  script:
+    """
+    gatk FastaAlternateReferenceMaker -R ${ref_path} -O ${sample}.fasta -V ${sample}.consensus.variant-calls.vcf.gz
+    awk '/^>/ {printf(">%s\\n","${sample}");next;} {print}' ${sample}.fasta > ${sample}_consensus.fasta 
+    """
+
+}
+
+process create_alternate_reference_wgs {
+  container "$params.gatk"
+  errorStrategy 'retry'
+  time '1h'
+  label 'mid_mem'
+  publishDir "$params.out_path/alternate_reference/", mode : "copy"  
+  input:
+    each path(vcf_path)
+    path ref_path
+    path ref_index
+    path ref_dict
+
+  output:
+    path "${sample}_consensus.fasta", emit: alt_ref
+  script:
+    sample = vcf_path.getSimpleName().replaceAll("_snpeff", "")
+  
+    """
+    gatk IndexFeatureFile -I ${sample}_snpeff.vcf
+    gatk FastaAlternateReferenceMaker -R ${ref_path} -O ${sample}.fasta -V ${sample}_snpeff.vcf
+    awk '/^>/ {printf(">%s\\n","${sample}");next;} {print}' ${sample}.fasta > ${sample}_consensus.fasta 
+    """
+
+}
+
+
+
+
+process variant_call_muscle {
+  conda "$params.conda.enktl"
+  errorStrategy 'retry'
+  time '1h'
+  label 'mid_mem'
+  publishDir "$params.out_path/whole_genome_variant_calls/", mode : "copy", pattern : "*.tsv"
+  publishDir "$params.out_path/whole_genome_variant_calls_vcfs/", mode : "copy", pattern : "*.vcf" 
+  input:
+    each path(fasta_file)
+    path ref_path
+
+  output:
+    path "${sample}_snpeff.tsv", emit: alt_ref
+    path "${sample}.vcf", emit: all_vcf
+
+  script:
+    sample = fasta_file.getSimpleName().replaceAll(".\\d?.fasta.masked|.\\d_consesus.fasta.masked|_S\\d+_abacas.fasta.masked|_2300_abacas.fasta.masked|_consensus/.fasta.masked", "")
+    """
+    nucmer -p ${sample} ${ref_path} ${fasta_file}
+    show-snps -T ${sample}.delta > ${sample}.snps
+    /home/sravisha/software/all2vcf/all2vcf mummer --no-Ns --snps ${sample}.snps --reference ${ref_path} --input-header --output-header > ${sample}.vcf 
+    snpEff -Xmx4g -v ebv -s ${sample}_summary.html ${sample}.vcf > ${sample}_snpeff.vcf
+    cat ${sample}_snpeff.vcf | ~/.conda/pkgs/snpsift-4.3.1t-hdfd78af_3/share/snpsift-4.3.1t-3/scripts/vcfEffOnePerLine.pl  > ${sample}_oneperline.vcf 
+    SnpSift extractFields ${sample}_oneperline.vcf CHROM POS REF ALT "ANN[*].EFFECT" "ANN[*].GENE" "ANN[*].HGVS_P" > ${sample}_snpeff.tsv 
+    """
+
+}
+
+process variant_call_genome {
+  container "$params.gatk"
+  errorStrategy 'retry'
+  time '1h'
+  label 'mid_mem'
+  publishDir "$params.out_path/variant_call_genome/", mode : "copy"  
+  input:
+    each path(vcf_path)
+    path ref_path
+    path ref_index
+    path ref_dict
+
+  output:
+    path "${sample}_consensus.fasta", emit: alt_ref
+  script:
+    sample = vcf_path.getSimpleName().replaceAll("_sorted_snpeff", "")
+  
+    """
+    gatk IndexFeatureFile -I ${sample}_snpeff.vcf
+    gatk FastaAlternateReferenceMaker -R ${ref_path} -O ${sample}.fasta -V ${sample}_snpeff.vcf
+    awk '/^>/ {printf(">%s\\n","${sample}");next;} {print}' ${sample}.fasta > ${sample}_consensus.fasta 
+    """
+
+}
